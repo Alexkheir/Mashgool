@@ -1,0 +1,33 @@
+# Dependencies — installed inside the image
+node_modules
+**/node_modules
+
+# Builds — produced inside the image
+**/.next
+**/dist
+**/out
+**/*.tsbuildinfo
+
+# Git
+.git
+.gitignore
+
+# Environment files — injected at runtime, never baked into images
+.env
+.env.*
+!.env.example
+apps/**/.env
+apps/**/.env.*
+
+# Local-only files
+coverage
+**/coverage
+*.log
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+
+# Docs and planning — not needed in images
+*.md
+docs

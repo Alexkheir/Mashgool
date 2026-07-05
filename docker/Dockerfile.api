@@ -1,0 +1,53 @@
+# docker/Dockerfile.api — Express API
+#
+# npm-workspaces monorepo: the single lockfile lives at the repo root, so every
+# stage copies root package.json + package-lock.json and installs with
+# `npm ci --workspace`. Build context must be the repo root.
+
+# ─── BASE ────────────────────────────────────────────────────────────────────
+FROM node:24.18-alpine AS base
+WORKDIR /repo
+
+# ─── DEPS ────────────────────────────────────────────────────────────────────
+FROM base AS deps
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+RUN npm ci --workspace=apps/api
+
+# ─── DEV ─────────────────────────────────────────────────────────────────────
+# Source is volume-mounted over /repo/apps/api by docker-compose.yml.
+FROM deps AS dev
+WORKDIR /repo/apps/api
+ENV NODE_ENV=development
+EXPOSE 4000
+CMD ["npm", "run", "dev"]
+
+# ─── BUILDER ─────────────────────────────────────────────────────────────────
+FROM deps AS builder
+COPY apps/api/ apps/api/
+WORKDIR /repo/apps/api
+RUN npm run build
+
+# ─── PROD DEPS ───────────────────────────────────────────────────────────────
+# Fresh install without devDependencies so the prod image stays lean.
+FROM base AS prod-deps
+COPY package.json package-lock.json ./
+COPY apps/api/package.json apps/api/
+RUN npm ci --workspace=apps/api --omit=dev
+
+# ─── PROD ────────────────────────────────────────────────────────────────────
+FROM node:24.18-alpine AS prod
+WORKDIR /app
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs \
+  && adduser --system --uid 1001 expressjs
+
+COPY --from=prod-deps --chown=expressjs:nodejs /repo/node_modules ./node_modules
+COPY --from=builder --chown=expressjs:nodejs /repo/apps/api/dist ./dist
+COPY --from=builder /repo/apps/api/package.json ./package.json
+
+USER expressjs
+EXPOSE 4000
+ENV PORT=4000
+CMD ["node", "dist/index.js"]

@@ -1,0 +1,20 @@
+{
+  "name": "mashgool",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w apps/web\" \"npm run dev -w apps/api\"",
+    "build": "npm run build -w apps/web && npm run build -w apps/api",
+    "test": "npm run test -w apps/web && npm run test -w apps/api",
+    "lint": "npm run lint -w apps/web && npm run lint -w apps/api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

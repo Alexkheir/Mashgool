@@ -1,0 +1,94 @@
+# docker-compose.yml — LOCAL DEVELOPMENT ONLY
+#
+# One command starts the whole stack:  docker compose up
+# Interpolated ${...} values come from the root .env file (see .env.example).
+#
+# ⚠️  `docker compose down -v` wipes the database volume. Never in production.
+
+services:
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app
+      target: dev
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      # File-change events don't always propagate through Windows/macOS bind
+      # mounts — polling keeps hot reload reliable.
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./apps/web:/repo/apps/web
+      # Keep container-built artifacts out of the host bind mount:
+      - /repo/apps/web/node_modules
+      - /repo/apps/web/.next
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - mashgool
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+      target: dev
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=development
+      - PORT=4000
+      - ALLOWED_ORIGIN=http://localhost:3000
+      - CHOKIDAR_USEPOLLING=true
+    volumes:
+      - ./apps/api:/repo/apps/api
+      - /repo/apps/api/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - mashgool
+
+  db:
+    image: postgres:16.14-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mashgool}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-mashgool}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mashgool
+
+  adminer:
+    image: adminer:5
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - mashgool
+
+volumes:
+  postgres_data:
+
+networks:
+  mashgool:
+    driver: bridge
