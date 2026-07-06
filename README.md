@@ -47,6 +47,14 @@ npm run lint               # lint both apps
 
 Single workspace: `npm run <script> -w apps/web` or `-w apps/api`.
 
+## Deployment
+
+Every merge to `main` runs Test → Build → Push (GHCR) → Deploy via
+`.github/workflows/deploy.yml`. The Deploy job is gated by the
+`DEPLOY_ENABLED` repository variable. Server setup, SSL, GitHub
+secrets, and the rollback procedure are documented in
+[docs/deployment.md](docs/deployment.md).
+
 ## Repository layout
 
 ```

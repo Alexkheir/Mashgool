@@ -1,5 +1,12 @@
 # Project Progress Log
 
+## Phase 0b (CI/CD + prod infra) — 2026-07-06
+
+- Implemented: `.github/workflows/deploy.yml` (PR→test only; main→Test/Build/Push GHCR/Deploy, deploy gated by `DEPLOY_ENABLED` var); `docker-compose.prod.yml` (app/api/db/nginx, persistent `postgres_data`, only nginx exposed); nginx config w/ envsubst `${DOMAIN}` template + Let's Encrypt; `docs/deployment.md` runbook (Oracle Always Free + DuckDNS); `.env.prod.example`.
+- Key decisions: multi-arch images (amd64+arm64 — Oracle free VMs are ARM); prod API is same-origin `/api` via nginx (`NEXT_PUBLIC_API_URL=""` build arg — fixes build-time-baked URL, avoids cross-site cookies); no nginx rate limits (Express is source of truth); resolver-variable proxy_pass so nginx survives container recreation; rollback = `IMAGE_TAG=<sha>` on VPS. Oracle free tier halved June 2026 → 2 OCPU/12GB (still fine).
+- Validated: prod stages of both Dockerfiles build + boot (web 200, api health ok); `compose config`, `nginx -t` (self-signed), actionlint, tests 5/5, lint, `npm audit --audit-level=high` all pass.
+- Next: user provisions Oracle VM + DuckDNS + GitHub secrets per runbook; set `DEPLOY_ENABLED=true`; run Feature 6 validation checklist (hello-world over HTTPS, bad-push + rollback drills).
+
 ## Docs alignment — 2026-07-06
 
 - Implemented: PROGRESS.md log + CLAUDE.md progress-tracking rules; fixed Project_phases.md and Project_requirement.md to reflect self-hosted prod DB (commit `e0c5c4a`).

@@ -1,0 +1,129 @@
+# docker-compose.prod.yml — PRODUCTION ONLY (runs on the VPS, driven by CI/CD)
+#
+# Never used locally. The CI pipeline copies this file (and docker/nginx/) to
+# /opt/mashgool on the VPS and runs:
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-build
+#
+# Interpolated ${...} values come from /opt/mashgool/.env.prod, which the
+# deploy job writes from GitHub Actions secrets (see .env.prod.example).
+#
+# Only nginx is reachable from the internet (ports 80/443). web, api and db
+# have no published ports — they talk over the internal Docker network.
+#
+# ⚠️  The db service stores data in the named volume `postgres_data` on the
+#     VPS. `docker compose down -v` DESTROYS it. Never run that here.
+
+services:
+
+  web:
+    image: ghcr.io/${GHCR_OWNER}/mashgool-web:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      # NEXT_PUBLIC_* is baked in at image build time (same-origin ''), so it
+      # is deliberately NOT set here — setting it at runtime has no effect.
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mashgool
+
+  api:
+    image: ghcr.io/${GHCR_OWNER}/mashgool-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      # Same-origin via nginx, so the browser origin is the public domain.
+      - ALLOWED_ORIGIN=https://${DOMAIN}
+      # Built from the same POSTGRES_* values the db container uses — one
+      # source of truth in .env.prod, no drift possible.
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mashgool
+
+  db:
+    image: postgres:16.14-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # Persistent VPS-side storage — data survives container recreation,
+      # image upgrades and reboots. This volume is the database.
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mashgool
+
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Substituted into default.conf.template by the official image's
+      # envsubst entrypoint (server_name, certificate paths).
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+      # Let's Encrypt certificates live on the VPS host (managed by certbot).
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      # Webroot for certbot renewal challenges (http://<domain>/.well-known/…).
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - mashgool
+
+volumes:
+  postgres_data:
+
+networks:
+  mashgool:
+    driver: bridge

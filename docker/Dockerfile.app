@@ -29,6 +29,12 @@ FROM deps AS builder
 COPY apps/web/ apps/web/
 WORKDIR /repo/apps/web
 ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time.
+# Empty string = same-origin: the browser calls /api/... on the public domain
+# and nginx routes it to the api container. Local dev overrides this via
+# docker-compose.yml instead (http://localhost:4000).
+ARG NEXT_PUBLIC_API_URL=""
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN npm run build
 
 # ─── PROD ────────────────────────────────────────────────────────────────────
