@@ -110,3 +110,9 @@ Prisma models use `@map`/`@@map` to bridge camelCase (TS) and snake_case (DB). A
 Out of scope for v1 (do **not** build, but do **not** architect them out): team collaboration, client portal, invoicing, mobile app, WhatsApp/email/calendar integration, time tracking, recurring tasks, file attachments, Arabic UI (input is bilingual, but the interface is English-only), MFA, WIP limits, multi-task extraction from one message.
 
 When a design decision is genuinely ambiguous, ask rather than guess — the brief explicitly prefers an upfront question over a wrong assumption.
+
+## Progress Tracking
+
+- After completing each commit, append a new dated entry to `PROGRESS.md` summarizing what was implemented, any key decisions made, and what's next. Keep it short — 3-5 lines.
+- At the start of any new session, read `PROGRESS.md` before proposing or starting work, so context from prior sessions carries over without needing to resume the full conversation.
+- Do not let `PROGRESS.md` entries grow verbose over time — stay factual and brief.

@@ -53,9 +53,9 @@ Code changes should reflect immediately without rebuilding the container. The lo
 
 ### Production Environment
 
-The production environment also runs in Docker but with some important differences. In production there is no local database — I want to use a managed PostgreSQL service such as Supabase, Railway, or Neon. The managed provider handles backups, failover, and upgrades so I do not have to worry about database operations. The app connects to it via a connection string stored as an environment variable.
+The production environment also runs in Docker but with some important differences. *(Updated 2026-07-05: the original plan was a managed PostgreSQL service such as Supabase, Railway, or Neon. Decision: PostgreSQL will instead run as a Docker container on the VPS, self-hosted for a better learning experience.)* Because we own the database, its data directory must be mounted to a persistent volume on the VPS so data survives container recreation, and backups become entirely our responsibility (see the Backups section). The app connects to it via a connection string stored as an environment variable, and the database container is never exposed to the public internet.
 
-The production stack consists of the Next.js app, the Express API, and Nginx. Nginx handles all incoming traffic, terminates SSL, and routes requests to the correct service. Nothing is exposed directly to the internet except through Nginx on ports 80 and 443.
+The production stack consists of the Next.js app, the Express API, PostgreSQL, and Nginx. Nginx handles all incoming traffic, terminates SSL, and routes requests to the correct service. Nothing is exposed directly to the internet except through Nginx on ports 80 and 443.
 
 ### Docker Image Strategy
 
@@ -279,7 +279,7 @@ Docker container logs should have rotation configured so they do not fill up the
 
 ### Backups
 
-The managed database provider handles automated backups. On top of that I want a nightly `pg_dump` uploaded to S3-compatible object storage with thirty days of retention. The backup restoration process must be documented step by step and tested manually before any real users are onboarded. There should also be a documented procedure for rebuilding the entire production environment from scratch using only the repository and the latest backup.
+*(Updated 2026-07-05: there is no managed provider — the self-hosted Postgres container has no built-in backups, so the `pg_dump` job below is the only backup layer and is mandatory before any real users are onboarded.)* I want a nightly `pg_dump` uploaded to S3-compatible object storage with thirty days of retention. The backup restoration process must be documented step by step and tested manually before any real users are onboarded. There should also be a documented procedure for rebuilding the entire production environment from scratch using only the repository and the latest backup.
 
 ---
 
@@ -309,8 +309,8 @@ To keep version one focused, the following are explicitly not being built. Do no
 These decisions need to be made before or during development.
 
 - **Product name:** FreelanceFlow is a working title. A final name needs to be picked before buying a domain or setting up any accounts.
-- **Hosting budget:** This determines VPS size and which managed database provider to use.
-- **Managed database provider:** Supabase, Railway, and Neon are all options. A choice needs to be made before production setup begins.
+- **Hosting budget:** This determines VPS size (the VPS also hosts the Postgres container, so disk and RAM must account for it).
+- ~~**Managed database provider:** Supabase, Railway, and Neon are all options.~~ *Resolved 2026-07-05: no managed provider — PostgreSQL runs in Docker on the VPS.*
 - **Extraction confidence UX:** Should Claude surface a confidence score to the user or just flag uncertain fields visually without a score?
 
 ---

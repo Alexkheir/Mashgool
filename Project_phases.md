@@ -81,8 +81,10 @@
 **Compose File**
 - A `docker-compose.prod.yml` exists and defines the production stack
 - It is never used locally — only used on the VPS by the CI/CD pipeline
-- The compose file defines three services: `app`, `api`, `nginx`
-- There is no `db` service in production — the app connects to a managed PostgreSQL database via `DATABASE_URL`
+- The compose file defines four services: `app`, `api`, `db`, `nginx`
+- The `db` service runs PostgreSQL in Docker on the VPS (decided 2026-07-05 — self-hosted for the learning experience, instead of a managed provider); the app connects to it via `DATABASE_URL`
+- The `db` service **must** mount a volume on the VPS (named Docker volume or host bind mount) for `/var/lib/postgresql/data` — without it, all data is lost when the container is recreated
+- The `db` container is never exposed to the public internet — no published port; only reachable by `api` over the internal Docker network
 
 **App Service (Next.js)**
 - Uses the `prod` stage of `Dockerfile.app`
@@ -156,7 +158,8 @@
 - `VPS_HOST` — IP address or domain of the production server
 - `VPS_USER` — SSH user on the VPS
 - `VPS_SSH_KEY` — private SSH key for authenticating into the VPS
-- `DATABASE_URL` — managed PostgreSQL connection string
+- `DATABASE_URL` — connection string for the Postgres container (uses the `db` service name as host)
+- `POSTGRES_PASSWORD` — password for the production Postgres container
 - `GOOGLE_CLIENT_ID` — Google OAuth client ID
 - `GOOGLE_CLIENT_SECRET` — Google OAuth client secret
 - `CLAUDE_API_KEY` — Anthropic Claude API key
@@ -184,10 +187,11 @@
 - An SSL certificate is issued for the production domain before first deployment
 - Certbot auto-renewal is configured and tested — a dry run is executed to confirm it works
 
-**Managed Database**
-- A managed PostgreSQL database is provisioned (Supabase, Railway, or Neon)
-- The connection string is stored as a GitHub Actions secret and injected at runtime
-- The managed database provider handles backups, failover, and upgrades
+**Production Database (Postgres in Docker)**
+- PostgreSQL runs as the `db` service in `docker-compose.prod.yml` on the VPS (decided 2026-07-05 — no managed provider)
+- A persistent volume is created on the VPS and mounted at `/var/lib/postgresql/data` so data survives container recreation, image upgrades, and reboots
+- The connection string (`DATABASE_URL`) and `POSTGRES_PASSWORD` are stored as GitHub Actions secrets and injected at runtime
+- Backups, upgrades, and failure recovery are our responsibility — the nightly `pg_dump` (Feature 22) is the only backup and is therefore mandatory before real data exists
 
 ---
 
@@ -689,7 +693,7 @@
 **Database Optimization**
 - Indexes added on: `user_id`, `client_id`, `status`, `due_date`, `task_key`
 - Connection pooling configured via Prisma
-- Slow query logging enabled in the managed database
+- Slow query logging enabled in the Postgres container (`log_min_duration_statement`)
 
 **Next.js Optimization**
 - Static generation used where possible
@@ -746,8 +750,8 @@
 ## Feature 22 — Backup Strategy
 
 **Automated Database Backups**
-- A cron job runs on the managed database provider's built-in backup schedule
-- Additionally a nightly `pg_dump` is triggered via a cron job and the output uploaded to S3-compatible object storage
+- There is no managed provider — the nightly `pg_dump` is the **only** backup layer, so it must be in place before any real data exists
+- A nightly `pg_dump` (run via `docker exec` against the `db` container) is triggered by a cron job on the VPS and the output uploaded to S3-compatible object storage
 - Backup files are named with timestamps (e.g. `backup-2024-01-15-02-00.sql.gz`)
 - The last 30 daily backups are retained — older ones deleted automatically
 
