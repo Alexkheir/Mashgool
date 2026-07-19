@@ -17,6 +17,9 @@ apps/**/.env.*
 !apps/**/.env.example
 !apps/**/.env.*.example
 
+# Personal learning journal — local only, never pushed
+LEARNING.md
+
 # Test artifacts
 coverage/
 .playwright-mcp/

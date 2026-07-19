@@ -1,5 +1,12 @@
 # Project Progress Log
 
+## Feature 5 provisioning + first-deploy healthcheck fix — 2026-07-19
+
+- Infra: hosting switched Oracle→**RackNerd paid VPS** (amd64, static IP). Provisioned per runbook: `deploy` user (sudo+docker), key-only SSH (root kept, `prohibit-password`), UFW 22/80/443, `/opt/mashgool` + `/var/www/certbot`, DuckDNS domain `mashgool.duckdns.org`, cert via certbot standalone, GitHub secrets/vars set, `DEPLOY_ENABLED=true`.
+- First deploy failed: web `unhealthy` → nginx (depends_on) never created. Root cause: healthcheck `wget localhost` resolved to `::1`, but Next standalone binds IPv4-only (`HOSTNAME=0.0.0.0`); api passed by luck (Express binds dual-stack).
+- Fix: healthchecks probe `127.0.0.1` explicitly (prod web+api, dev api). Also committed the LEARNING.md gitignore rule.
+- Next: merge → auto-redeploy → finish Feature 6 checklist (HTTPS check, `certbot renew --dry-run`, bad-push + rollback drills); update `docs/deployment.md` §1–2 for RackNerd.
+
 ## Phase 0b (CI/CD + prod infra) — 2026-07-06
 
 - Implemented: `.github/workflows/deploy.yml` (PR→test only; main→Test/Build/Push GHCR/Deploy, deploy gated by `DEPLOY_ENABLED` var); `docker-compose.prod.yml` (app/api/db/nginx, persistent `postgres_data`, only nginx exposed); nginx config w/ envsubst `${DOMAIN}` template + Let's Encrypt; `docs/deployment.md` runbook (Oracle Always Free + DuckDNS); `.env.prod.example`.

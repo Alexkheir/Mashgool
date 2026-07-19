@@ -26,7 +26,10 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      # 127.0.0.1, not localhost: the standalone Next.js server binds IPv4-only
+      # (HOSTNAME=0.0.0.0), but localhost can resolve to ::1 first — the check
+      # then probes an address nobody listens on and marks a healthy app down.
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -54,7 +57,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4000/api/v1/health"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:4000/api/v1/health"]
       interval: 30s
       timeout: 10s
       retries: 3
