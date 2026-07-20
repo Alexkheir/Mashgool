@@ -1,5 +1,27 @@
 # Project Progress Log
 
+## Phase 1 Feature 7 (auth) — frontend + production wiring — 2026-07-20
+
+- Frontend login verified end-to-end locally: `docker compose up` (rebuilt images — dev api node_modules predated Prisma), `prisma migrate deploy` in the api container, real Google sign-in works (localhost). App code was already prod-aware (secure cookie gated on NODE_ENV, post-login redirect to `${ALLOWED_ORIGIN}/dashboard`, same-origin web build).
+- **Prisma prod integration (was deferred):** `Dockerfile.api` prod stage now runs `prisma generate` (client shipped without devDeps) and a new `docker/api-entrypoint.sh` runs `prisma migrate deploy` on container start (idempotent, gated on db healthcheck) — retired the deploy.yml migration TODO. Moved `prisma` to `dependencies`. Validated: prod image builds, migrates a fresh db, boots (health 200, users table created).
+- **Prod auth secrets wired:** `docker-compose.prod.yml` api now gets JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (from .env.prod) + GOOGLE_CALLBACK_URL derived from DOMAIN; `deploy.yml` writes them into .env.prod from GitHub secrets; `.env.prod.example` documents them. Without this the prod API crashed at boot (env validation).
+- **Pending user actions before merge/deploy:** Google Console — add prod redirect URI `https://<domain>/api/v1/auth/google/callback` + JS origin `https://<domain>`; GitHub — add secrets JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET.
+
+## Phase 1 Feature 7 (auth) — backend OAuth flow — 2026-07-20
+
+- Google OAuth backend on `feat/phase-1-auth`: `config/env.ts` (Zod, exits on missing vars; validates only Feature-7 vars), `auth.service.ts` (google-auth-library code→id_token→verified profile→upsert on googleId→issue JWT; only Prisma caller), `requireAuth` (cookie JWT→load user; identical 401 for bad-token vs unknown-user), `error.middleware.ts` (AppError + global handler, Sentry deferred), 4 routes (`/auth/google`, `/callback`, `/me`, `/logout`), cookie httpOnly+lax+7d (secure in prod).
+- Deps: google-auth-library, jsonwebtoken, cookie-parser, zod(v4), dotenv. Added eslint `no-unused-vars` underscore/rest-sibling ignore; vitest.config injects test env.
+- Verified: 12 tests green (requireAuth + service paths), build, lint, and a live host smoke test (health 200; /auth/google 302→Google w/ openid+email+profile; /me + /logout 401 w/o cookie). Booted on :4100 since budget_tracker holds :4000.
+- Dev compose + .env examples carry the auth vars with dev defaults (stack boots without real Google creds). **Not yet done on branch:** Dockerfile.api Prisma prod integration, frontend, and prod env/secrets — don't merge until those land. User must create Google OAuth creds for a live sign-in test.
+
+## Phase 1 Feature 7 (auth) — data layer — 2026-07-20
+
+- Added Prisma ORM to apps/api on branch `feat/phase-1-auth`. `User` model only (no password — Google is sole IdP); initial migration `init_users` creates the `users` table (UUID PK, snake_case cols, unique google_id + email). `lib/prisma.ts` = one client per process, cached on globalThis in dev.
+- Decision: **pinned Prisma to 6.x**. v7 (installed first) dropped in-schema `url = env(...)` and now requires a driver adapter + prisma.config.ts; declined that complexity for a learning project — 6.x matches the tech spec and tutorials. Client/AuditLog models deferred to their own features (no columns added to users, so clean).
+- Scripts: `pre{dev,build,test}` run `prisma generate`; `migrate:deploy` for prod. DATABASE_URL wired into dev compose api service (derived from db POSTGRES_*).
+- Verified: validate, build, tests, and a real client round-trip against Postgres (had to use a throwaway db on :5433 — the user's separate `budget_tracker` stack occupies :5432/:4000/:3000 locally).
+- Next (same branch): Zod env validation (`config/env.ts`) → `auth.service.ts` (Google OAuth exchange + upsert) → `requireAuth` → controller/routes → Dockerfile.api Prisma prod integration → frontend. User will need to create Google OAuth credentials before a live end-to-end test.
+
 ## Feature 5 provisioning + first-deploy healthcheck fix — 2026-07-19
 
 - Infra: hosting switched Oracle→**RackNerd paid VPS** (amd64, static IP). Provisioned per runbook: `deploy` user (sudo+docker), key-only SSH (root kept, `prohibit-password`), UFW 22/80/443, `/opt/mashgool` + `/var/www/certbot`, DuckDNS domain `mashgool.duckdns.org`, cert via certbot standalone, GitHub secrets/vars set, `DEPLOY_ENABLED=true`.

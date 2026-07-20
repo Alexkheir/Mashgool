@@ -145,7 +145,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           # Passed as environment variables to the remote script — avoids
           # interpolating secrets directly into shell text.
-          envs: IMAGE_TAG,GHCR_OWNER,DOMAIN,POSTGRES_PASSWORD,GHCR_PULL_TOKEN
+          envs: IMAGE_TAG,GHCR_OWNER,DOMAIN,POSTGRES_PASSWORD,GHCR_PULL_TOKEN,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET
           script: |
             set -euo pipefail
             cd /opt/mashgool
@@ -159,6 +159,9 @@ jobs:
             POSTGRES_DB=mashgool
             POSTGRES_USER=postgres
             POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+            JWT_SECRET=$JWT_SECRET
+            GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
+            GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
             EOF
             chmod 600 .env.prod
 
@@ -168,8 +171,9 @@ jobs:
 
             docker compose -f docker-compose.prod.yml --env-file .env.prod pull
 
-            # TODO(Phase 1): run `npx prisma migrate deploy` here, between
-            # pull and up, once the API has a Prisma schema.
+            # Database migrations run automatically inside the api container's
+            # entrypoint (`prisma migrate deploy`) before the server starts —
+            # idempotent, and gated on the db healthcheck. Nothing to do here.
 
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-build
 
@@ -180,6 +184,9 @@ jobs:
           DOMAIN: ${{ vars.DOMAIN }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           GHCR_PULL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
 
       # A deploy that leaves the site down should be a red ❌, not a green ✓.
       - name: Smoke check

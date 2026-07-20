@@ -3,19 +3,32 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "prisma generate",
     "dev": "tsx watch src/index.ts",
+    "prebuild": "prisma generate",
     "build": "tsc",
     "start": "node dist/index.js",
+    "pretest": "prisma generate",
     "test": "vitest run",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "express": "^5.2.1"
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.9.0",
+    "jsonwebtoken": "^9.0.3",
+    "prisma": "^6.19.3",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.0",
     "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.0.0",
     "@types/supertest": "^6.0.0",
     "eslint": "^9.30.0",

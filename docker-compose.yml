@@ -43,6 +43,16 @@ services:
       - PORT=4000
       - ALLOWED_ORIGIN=http://localhost:3000
       - CHOKIDAR_USEPOLLING=true
+      # Derived from the same POSTGRES_* the db service uses (one source of
+      # truth). Host is `db` — the service name on the internal network.
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-mashgool}
+      # Auth (Feature 7). Defaults keep local dev booting out of the box; set
+      # real Google credentials in the root .env for actual sign-in to work.
+      - JWT_SECRET=${JWT_SECRET:-dev-local-jwt-secret-not-for-production-0123456789}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-placeholder.apps.googleusercontent.com}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-placeholder-google-client-secret}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:4000/api/v1/auth/google/callback}
     volumes:
       - ./apps/api:/repo/apps/api
       - /repo/apps/api/node_modules
