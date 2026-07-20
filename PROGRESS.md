@@ -1,5 +1,13 @@
 # Project Progress Log
 
+## Feature 6 go-live validation — 2026-07-20
+
+- Certbot renewal was silently broken: original cert used `standalone` auth (needs port 80 free), but nginx now holds port 80 permanently → real renewal in ~90 days would have failed. Fixed by reissuing via `--webroot -w /var/www/certbot` (nginx already had the `.well-known/acme-challenge` location + mount, just unused); renewal config now uses webroot permanently. `certbot renew --dry-run` passes clean.
+- Bad-push drill: pushed a deliberately failing test (PR `test/bad-push-drill`), confirmed `test` job goes red on both PR checks and on `main`, confirmed `build`/`deploy` never ran and the VPS was untouched throughout. Reverted + added a visible "Deploy marker: v2" line to the hello-world page (PR `fix/bad-push-drill-revert`, merge SHA `14e0d04`) for the rollback drill.
+- Rollback drill: pinned `.env.prod` `IMAGE_TAG` to the prior good SHA `5e4e715` and redeployed with `docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-build` — confirmed via the marker disappearing that the old image was actually serving traffic. Rolled forward again to `14e0d04`. Found and documented a real mistake along the way: `docker compose` needs `--env-file .env.prod` explicitly (no auto-load of non-`.env`-named files) or every `${VAR}` silently blanks out.
+- Added `RUNBOOK.md` (gitignored, alongside `LEARNING.md`) — condensed command reference for rollback/recovery/cert-renewal/backup, distinct from LEARNING.md's narrative "why".
+- Feature 6 checklist now complete. Next: update `docs/deployment.md` §1–2 for RackNerd (still describes Oracle), then Phase 1 (auth, Prisma schema) on a new branch.
+
 ## Feature 5 provisioning + first-deploy healthcheck fix — 2026-07-19
 
 - Infra: hosting switched Oracle→**RackNerd paid VPS** (amd64, static IP). Provisioned per runbook: `deploy` user (sudo+docker), key-only SSH (root kept, `prohibit-password`), UFW 22/80/443, `/opt/mashgool` + `/var/www/certbot`, DuckDNS domain `mashgool.duckdns.org`, cert via certbot standalone, GitHub secrets/vars set, `DEPLOY_ENABLED=true`.
