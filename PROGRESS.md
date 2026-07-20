@@ -1,5 +1,12 @@
 # Project Progress Log
 
+## Phase 1 Feature 7 (auth) — backend OAuth flow — 2026-07-20
+
+- Google OAuth backend on `feat/phase-1-auth`: `config/env.ts` (Zod, exits on missing vars; validates only Feature-7 vars), `auth.service.ts` (google-auth-library code→id_token→verified profile→upsert on googleId→issue JWT; only Prisma caller), `requireAuth` (cookie JWT→load user; identical 401 for bad-token vs unknown-user), `error.middleware.ts` (AppError + global handler, Sentry deferred), 4 routes (`/auth/google`, `/callback`, `/me`, `/logout`), cookie httpOnly+lax+7d (secure in prod).
+- Deps: google-auth-library, jsonwebtoken, cookie-parser, zod(v4), dotenv. Added eslint `no-unused-vars` underscore/rest-sibling ignore; vitest.config injects test env.
+- Verified: 12 tests green (requireAuth + service paths), build, lint, and a live host smoke test (health 200; /auth/google 302→Google w/ openid+email+profile; /me + /logout 401 w/o cookie). Booted on :4100 since budget_tracker holds :4000.
+- Dev compose + .env examples carry the auth vars with dev defaults (stack boots without real Google creds). **Not yet done on branch:** Dockerfile.api Prisma prod integration, frontend, and prod env/secrets — don't merge until those land. User must create Google OAuth creds for a live sign-in test.
+
 ## Phase 1 Feature 7 (auth) — data layer — 2026-07-20
 
 - Added Prisma ORM to apps/api on branch `feat/phase-1-auth`. `User` model only (no password — Google is sole IdP); initial migration `init_users` creates the `users` table (UUID PK, snake_case cols, unique google_id + email). `lib/prisma.ts` = one client per process, cached on globalThis in dev.
