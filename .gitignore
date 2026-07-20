@@ -20,6 +20,9 @@ apps/**/.env.*
 # Personal learning journal — local only, never pushed
 LEARNING.md
 
+# Ops runbook (real command reference incl. rollback/recovery) — local only
+RUNBOOK.md
+
 # Test artifacts
 coverage/
 .playwright-mcp/
