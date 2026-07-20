@@ -7,9 +7,7 @@ describe('GET /api/v1/health', () => {
     const res = await request(createApp()).get('/api/v1/health');
 
     expect(res.status).toBe(200);
-    // Deliberately wrong — Feature 6 bad-push drill (2026-07-20): proves the
-    // `test` job blocks `build`/`deploy` on main. Revert after confirming red.
-    expect(res.body.status).toBe('definitely-not-ok');
+    expect(res.body.status).toBe('ok');
   });
 
   it('returns 404 for unknown routes', async () => {
