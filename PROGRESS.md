@@ -1,5 +1,12 @@
 # Project Progress Log
 
+## Phase 1 Feature 7 (auth) — SHIPPED to production — 2026-07-20
+
+- Merged to `main` (commit `de094d2`) and auto-deployed. **Google login works end-to-end in production** at https://mashgool.duckdns.org — same flow as local. Google Console + GitHub secrets set by owner.
+- Verified data persistence: the signed-in user survives a full container teardown+recreate (`docker compose down` without `-v` → `up`). DB is the named volume `postgres_data` (host `/var/lib/docker/volumes/mashgool_postgres_data/_data`, container `/var/lib/postgresql/data`). Only `down -v` destroys it. Sessions survive restarts while `JWT_SECRET` is unchanged.
+- Future-table migration flow (unchanged from here): edit `schema.prisma` → `prisma migrate dev --name x` in dev → commit the `prisma/migrations/` folder → merge; the api entrypoint's `migrate deploy` applies only new migrations. Additive = no data loss; Prisma warns on destructive ops in dev.
+- Next: nightly `pg_dump` backup on the VPS (deferred by user — the volume is not a backup), then Phase 1 next feature (Clients/tasks) on a new branch.
+
 ## Phase 1 Feature 7 (auth) — frontend + production wiring — 2026-07-20
 
 - Frontend login verified end-to-end locally: `docker compose up` (rebuilt images — dev api node_modules predated Prisma), `prisma migrate deploy` in the api container, real Google sign-in works (localhost). App code was already prod-aware (secure cookie gated on NODE_ENV, post-login redirect to `${ALLOWED_ORIGIN}/dashboard`, same-origin web build).
