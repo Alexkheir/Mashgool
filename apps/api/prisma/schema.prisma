@@ -1,0 +1,31 @@
+// Mashgool database schema (PostgreSQL via Prisma).
+//
+// Conventions (see CLAUDE.md): camelCase in TS, snake_case in the DB via
+// @map/@@map; all PKs are UUIDs; all timestamps are UTC. Tables are plural.
+//
+// The schema grows per feature. Feature 7 introduces only `User` — Google is
+// the sole identity provider, so there is no password to store. The Client and
+// AuditLog models (and User's back-relations to them) arrive in later features.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── USER ────────────────────────────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(uuid())
+  googleId  String   @unique @map("google_id")
+  email     String   @unique
+  name      String
+  avatarUrl String?  @map("avatar_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

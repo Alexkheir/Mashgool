@@ -43,6 +43,9 @@ services:
       - PORT=4000
       - ALLOWED_ORIGIN=http://localhost:3000
       - CHOKIDAR_USEPOLLING=true
+      # Derived from the same POSTGRES_* the db service uses (one source of
+      # truth). Host is `db` — the service name on the internal network.
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-mashgool}
     volumes:
       - ./apps/api:/repo/apps/api
       - /repo/apps/api/node_modules
