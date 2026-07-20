@@ -1,5 +1,13 @@
 # Project Progress Log
 
+## Phase 1 Feature 7 (auth) — data layer — 2026-07-20
+
+- Added Prisma ORM to apps/api on branch `feat/phase-1-auth`. `User` model only (no password — Google is sole IdP); initial migration `init_users` creates the `users` table (UUID PK, snake_case cols, unique google_id + email). `lib/prisma.ts` = one client per process, cached on globalThis in dev.
+- Decision: **pinned Prisma to 6.x**. v7 (installed first) dropped in-schema `url = env(...)` and now requires a driver adapter + prisma.config.ts; declined that complexity for a learning project — 6.x matches the tech spec and tutorials. Client/AuditLog models deferred to their own features (no columns added to users, so clean).
+- Scripts: `pre{dev,build,test}` run `prisma generate`; `migrate:deploy` for prod. DATABASE_URL wired into dev compose api service (derived from db POSTGRES_*).
+- Verified: validate, build, tests, and a real client round-trip against Postgres (had to use a throwaway db on :5433 — the user's separate `budget_tracker` stack occupies :5432/:4000/:3000 locally).
+- Next (same branch): Zod env validation (`config/env.ts`) → `auth.service.ts` (Google OAuth exchange + upsert) → `requireAuth` → controller/routes → Dockerfile.api Prisma prod integration → frontend. User will need to create Google OAuth credentials before a live end-to-end test.
+
 ## Feature 5 provisioning + first-deploy healthcheck fix — 2026-07-19
 
 - Infra: hosting switched Oracle→**RackNerd paid VPS** (amd64, static IP). Provisioned per runbook: `deploy` user (sudo+docker), key-only SSH (root kept, `prohibit-password`), UFW 22/80/443, `/opt/mashgool` + `/var/www/certbot`, DuckDNS domain `mashgool.duckdns.org`, cert via certbot standalone, GitHub secrets/vars set, `DEPLOY_ENABLED=true`.
