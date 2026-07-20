@@ -1,5 +1,12 @@
 # Project Progress Log
 
+## Phase 1 Feature 7 (auth) — frontend + production wiring — 2026-07-20
+
+- Frontend login verified end-to-end locally: `docker compose up` (rebuilt images — dev api node_modules predated Prisma), `prisma migrate deploy` in the api container, real Google sign-in works (localhost). App code was already prod-aware (secure cookie gated on NODE_ENV, post-login redirect to `${ALLOWED_ORIGIN}/dashboard`, same-origin web build).
+- **Prisma prod integration (was deferred):** `Dockerfile.api` prod stage now runs `prisma generate` (client shipped without devDeps) and a new `docker/api-entrypoint.sh` runs `prisma migrate deploy` on container start (idempotent, gated on db healthcheck) — retired the deploy.yml migration TODO. Moved `prisma` to `dependencies`. Validated: prod image builds, migrates a fresh db, boots (health 200, users table created).
+- **Prod auth secrets wired:** `docker-compose.prod.yml` api now gets JWT_SECRET/GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET (from .env.prod) + GOOGLE_CALLBACK_URL derived from DOMAIN; `deploy.yml` writes them into .env.prod from GitHub secrets; `.env.prod.example` documents them. Without this the prod API crashed at boot (env validation).
+- **Pending user actions before merge/deploy:** Google Console — add prod redirect URI `https://<domain>/api/v1/auth/google/callback` + JS origin `https://<domain>`; GitHub — add secrets JWT_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET.
+
 ## Phase 1 Feature 7 (auth) — backend OAuth flow — 2026-07-20
 
 - Google OAuth backend on `feat/phase-1-auth`: `config/env.ts` (Zod, exits on missing vars; validates only Feature-7 vars), `auth.service.ts` (google-auth-library code→id_token→verified profile→upsert on googleId→issue JWT; only Prisma caller), `requireAuth` (cookie JWT→load user; identical 401 for bad-token vs unknown-user), `error.middleware.ts` (AppError + global handler, Sentry deferred), 4 routes (`/auth/google`, `/callback`, `/me`, `/logout`), cookie httpOnly+lax+7d (secure in prod).

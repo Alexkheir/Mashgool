@@ -20,6 +20,9 @@ apps/**/.env.*
 # Personal learning journal — local only, never pushed
 LEARNING.md
 
+# Production break-glass runbook — local only, never pushed
+RUNBOOK.md
+
 # Test artifacts
 coverage/
 .playwright-mcp/
