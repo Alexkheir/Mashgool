@@ -1,5 +1,14 @@
 # Project Progress Log
 
+## Phase 1 Feature 8 (client workspaces) — 2026-07-30
+
+- Built Client Workspaces end-to-end on `feat/phase-1-clients`. **Backend:** `Client` + `AuditLog` models + migration `add_clients_and_audit`; 8 REST endpoints under `/api/v1/clients` (list, archived, create, get, update, delete, archive, unarchive); `.strict()` Zod DTOs + `validate` middleware; service is user-scoped (404-not-403), maps unique collisions → 409, `shortCode` immutable (absent from UpdateDto); first **audit-write infra** (append-only, fire-and-forget). 33 api tests green.
+- **Frontend** (hand-rolled Tailwind + new deps `zustand` + `zod`): `use-clients` React Query hooks (array keys + `['clients']` invalidation), `ui-store` (active client + view mode, persisted), client grid + create/edit modal (short-code auto-suggest from initials, override, collision→field error) + archive/unarchive + delete-with-confirm, wired into the dashboard. web tsc/lint/tests + `next build` green.
+- Decisions: kept hand-rolled Tailwind (no shadcn CLI) to match existing style; audit **writes** begin now (Phase 1) though the audit **UI** is Feature 17; open-task counts show `0` until Feature 9.
+- Local run after pulling new deps: `docker compose up -d --build --renew-anon-volumes` then `docker compose exec api npx prisma migrate deploy` (dev doesn't auto-migrate).
+- **CI audit fixed (2026-07-30):** newly-published highs resolved without breaking the app — `next` auto-bumped 16.2.10→16.2.12 (patches its own CVEs); root `overrides` pin `postcss@^8.5.25`, `sharp@^0.35.3`, `brace-expansion@^5.0.9` (parents next/eslint hadn't bumped). `npm audit --audit-level=high` now 0 vulns; `npm ci` reproduces it; lint/tests/builds green. No allowlist needed. (Fragile npm detail: overrides only applied after a clean `rm -rf node_modules package-lock.json && npm install` — `npm install` alone short-circuited "up to date".)
+- Next: Feature 9 (Task Management) — tasks + atomic task keys via `Client.taskCounter`.
+
 ## Phase 1 Feature 7 (auth) — frontend + production wiring — 2026-07-20
 
 - Frontend login verified end-to-end locally: `docker compose up` (rebuilt images — dev api node_modules predated Prisma), `prisma migrate deploy` in the api container, real Google sign-in works (localhost). App code was already prod-aware (secure cookie gated on NODE_ENV, post-login redirect to `${ALLOWED_ORIGIN}/dashboard`, same-origin web build).

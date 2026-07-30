@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { authQueryKey, logout, useAuth } from '@/lib/use-auth';
+import { ClientsView } from '@/components/clients/clients-view';
 
 export function DashboardClient() {
   const router = useRouter();
@@ -25,11 +26,15 @@ export function DashboardClient() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-neutral-500">Loading…</p>;
+    return <p className="p-6 text-sm text-neutral-500">Loading…</p>;
   }
 
   if (isError) {
-    return <p className="text-sm text-red-600">Couldn’t load your session. Please try again.</p>;
+    return (
+      <p className="p-6 text-sm text-red-600">
+        Couldn’t load your session. Please try again.
+      </p>
+    );
   }
 
   if (!user) {
@@ -37,37 +42,36 @@ export function DashboardClient() {
   }
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-neutral-200 bg-white p-8 shadow-sm">
-      <div className="flex items-center gap-4">
-        {user.avatarUrl ? (
-          <img
-            src={user.avatarUrl}
-            alt=""
-            className="h-12 w-12 rounded-full object-cover"
-          />
-        ) : (
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-neutral-900 text-lg font-medium text-white">
-            {user.name.charAt(0).toUpperCase()}
+    <div className="min-h-screen">
+      <header className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
+        <div className="flex items-center gap-3">
+          {user.avatarUrl ? (
+            <img
+              src={user.avatarUrl}
+              alt=""
+              className="h-9 w-9 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-sm font-medium text-white">
+              {user.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="leading-tight">
+            <p className="text-sm font-medium text-neutral-950">{user.name}</p>
+            <p className="text-xs text-neutral-500">{user.email}</p>
           </div>
-        )}
-        <div>
-          <p className="font-medium text-neutral-950">{user.name}</p>
-          <p className="text-sm text-neutral-500">{user.email}</p>
         </div>
-      </div>
 
-      <p className="mt-6 text-sm text-neutral-500">
-        You’re signed in. The real dashboard arrives in a later feature — this is a
-        placeholder to prove the auth session works end to end.
-      </p>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+        >
+          Log out
+        </button>
+      </header>
 
-      <button
-        type="button"
-        onClick={handleLogout}
-        className="mt-6 w-full rounded-full bg-neutral-900 px-6 py-3 text-sm font-medium text-white transition hover:bg-neutral-800"
-      >
-        Log out
-      </button>
+      <ClientsView />
     </div>
   );
 }

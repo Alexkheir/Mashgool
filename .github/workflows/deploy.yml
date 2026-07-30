@@ -50,6 +50,9 @@ jobs:
         run: npm run test
 
       - name: Audit dependencies
+        # Clean at high/critical. Transitive offenders (postcss, sharp,
+        # brace-expansion) are pinned to patched versions via `overrides` in the
+        # root package.json until next/eslint bump them upstream.
         run: npm audit --audit-level=high
 
   # ─── STAGE 2: BUILD + PUSH ───────────────────────────────────────────────────

@@ -3,9 +3,9 @@
 // Conventions (see CLAUDE.md): camelCase in TS, snake_case in the DB via
 // @map/@@map; all PKs are UUIDs; all timestamps are UTC. Tables are plural.
 //
-// The schema grows per feature. Feature 7 introduces only `User` — Google is
-// the sole identity provider, so there is no password to store. The Client and
-// AuditLog models (and User's back-relations to them) arrive in later features.
+// The schema grows per feature. Feature 7 introduced `User`; Feature 8 adds
+// `Client` (workspaces) and `AuditLog` (append-only action trail). The `Task`
+// model — and Client's back-relation to it — arrives with Feature 9.
 
 generator client {
   provider = "prisma-client-js"
@@ -27,5 +27,92 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  clients   Client[]
+  auditLogs AuditLog[]
+
   @@map("users")
+}
+
+// ─── CLIENT ──────────────────────────────────────────────────────────────────
+//
+// A client workspace owned by one user. `shortCode` is the immutable prefix for
+// task keys (e.g. `BS` → `BS-1`, `BS-2`) and is unique per user. `taskCounter`
+// is the source of that number: it only ever increments (atomically, when a task
+// is created — Feature 9) and is never decremented, so deleted task numbers are
+// never reused. `isArchived` is a soft-archive flag — clients are archived, never
+// soft-deleted; deletion is permanent and cascades to their tasks.
+model Client {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  shortCode   String   @map("short_code")
+  description String?
+  color       String   @default("#4A90D9")
+  isArchived  Boolean  @default(false) @map("is_archived")
+  taskCounter Int      @default(0) @map("task_counter")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@unique([userId, shortCode])
+  @@index([userId])
+  @@index([userId, isArchived])
+  @@map("clients")
+}
+
+// ─── AUDIT LOG ───────────────────────────────────────────────────────────────
+//
+// Append-only trail of significant actions. Rows are only ever inserted, never
+// updated or deleted. `entityId` is nullable because some actions (sign in/out,
+// auth failures) aren't tied to a specific entity. `metadata` stores extracted
+// output fields only — never raw AI input or secrets. Writes are fire-and-forget
+// (see audit.service.ts) so a failed insert never breaks the main operation.
+model AuditLog {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  action      AuditAction
+  entityType  EntityType? @map("entity_type")
+  entityId    String?     @map("entity_id")
+  description String
+  metadata    Json?
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, action])
+  @@index([userId, entityType])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ─── ENUMS ───────────────────────────────────────────────────────────────────
+
+enum AuditAction {
+  USER_SIGNED_IN
+  USER_SIGNED_OUT
+  USER_AUTH_FAILED
+  CLIENT_CREATED
+  CLIENT_UPDATED
+  CLIENT_ARCHIVED
+  CLIENT_UNARCHIVED
+  CLIENT_DELETED
+  TASK_CREATED
+  TASK_UPDATED
+  TASK_STATUS_CHANGED
+  TASK_DELETED
+  AI_EXTRACTION_TRIGGERED
+  AI_TRANSCRIPTION_TRIGGERED
+
+  @@map("audit_action")
+}
+
+enum EntityType {
+  USER
+  CLIENT
+  TASK
+
+  @@map("entity_type")
 }

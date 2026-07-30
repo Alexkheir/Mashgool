@@ -17,7 +17,9 @@ apps/**/.env.*
 !apps/**/.env.example
 !apps/**/.env.*.example
 
-# Personal learning journal — local only, never pushed
+# Personal learning notes — local only, never pushed.
+# The learning/ folder replaces the old root LEARNING.md.
+learning/
 LEARNING.md
 
 # Production break-glass runbook — local only, never pushed
