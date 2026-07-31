@@ -17,6 +17,7 @@ export interface Client {
   description: string | null;
   color: string;
   isArchived: boolean;
+  openTaskCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,7 +45,9 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+// Exported so sibling hook modules (e.g. use-tasks) share one fetch wrapper —
+// the same credentials, JSON handling, and ApiError semantics.
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), {
     credentials: 'include',
     headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
@@ -73,6 +76,18 @@ export function useClients(): UseQueryResult<Client[]> {
     queryFn: async () => {
       const data = await request<{ clients: Client[] }>('/api/v1/clients');
       return data.clients;
+    }
+  });
+}
+
+// A single client by id — used by the workspace header (name, color, short code)
+// when the list isn't already cached (e.g. deep-linking to a workspace URL).
+export function useClient(id: string): UseQueryResult<Client> {
+  return useQuery({
+    queryKey: clientKeys.detail(id),
+    queryFn: async () => {
+      const data = await request<{ client: Client }>(`/api/v1/clients/${id}`);
+      return data.client;
     }
   });
 }

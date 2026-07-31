@@ -86,8 +86,9 @@ export function ClientCard({
       )}
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-3">
-        {/* Task counts arrive with Feature 9 — no tasks exist yet, so 0 is truthful. */}
-        <span className="text-xs text-neutral-400">0 open tasks</span>
+        <span className="text-xs text-neutral-400">
+          {client.openTaskCount} open {client.openTaskCount === 1 ? 'task' : 'tasks'}
+        </span>
         <div className="flex items-center gap-1">
           {onEdit && <CardAction label="Edit" onClick={onEdit} />}
           {onArchive && <CardAction label="Archive" onClick={onArchive} />}

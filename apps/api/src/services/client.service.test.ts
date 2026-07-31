@@ -43,6 +43,9 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
     color: '#4A90D9',
     isArchived: false,
     taskCounter: 0,
+    // Present so the list mapping (which reads client._count.tasks) is safe;
+    // ignored by the create/update paths that map with a default count of 0.
+    _count: { tasks: 0 },
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides
@@ -125,6 +128,12 @@ describe('listClients', () => {
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { userId: USER, isArchived: false } })
     );
+  });
+
+  it('surfaces the open-task count from the relation _count', async () => {
+    mockFindMany.mockResolvedValue([fakeClient({ _count: { tasks: 4 } })]);
+    const [client] = await clientService.listClients(USER);
+    expect(client.openTaskCount).toBe(4);
   });
 });
 

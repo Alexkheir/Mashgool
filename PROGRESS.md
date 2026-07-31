@@ -1,5 +1,15 @@
 # Project Progress Log
 
+## Phase 1 Feature 9 (task management) — 2026-07-31
+
+- Built Task Management end-to-end on `feat/phase-1-tasks`. **Backend:** `Task` model + `TaskStatus`/`Priority`/`CreationMethod` enums + migration `add_tasks`; 6 REST endpoints (2 nested `/clients/:id/tasks` for list+create, 4 flat `/tasks/:id`); atomic **task-key** generator (`UPDATE clients SET task_counter+1 … RETURNING` inside the create transaction — fixed the tech-spec's racy `$executeRaw`+separate-`findUnique` sample); user-scoped service (ownership via `client: { userId }`, 404-not-403); `.strict()` DTOs + new `validateQuery` middleware (Express 5 `req.query` is read-only → parsed onto `res.locals.query`); audit writes `TASK_CREATED/UPDATED/STATUS_CHANGED/DELETED`. Client list now returns a live `openTaskCount` (filtered `_count`). 62 api tests green.
+- **Frontend** (hand-rolled Tailwind, no new deps): `use-tasks` React Query hooks (params-keyed list, `keepPreviousData`, invalidates `['tasks']`+`['clients']`), workspace route `/dashboard/clients/[clientId]`, sortable/paginated task list, create/edit form, one-click Done, delete-with-confirm; extracted `AppFrame` (auth guard + header) shared by dashboard + workspace; client cards navigate + show real open-task count. web tsc/lint/3 tests + `next build` green.
+- Decisions: uppercase enum values in the API for status+priority (spec sample was inconsistent); sort is field-only in the UI (server applies per-field default direction); board drag-drop deferred to Feature 10 (`boardOrder` placed now), filter bar to Feature 11.
+- Due-date guard: a due date can't be set to a past day (a deadline in the past is meaningless). Enforced by a `.refine()` on the shared `dueDate` schema in both the API and web DTOs (→ 400 with a field error); the picker also sets `min=today`. Only fires when the date is set/changed, so a naturally-overdue task stays editable.
+- Local run: `docker compose up -d` then `docker compose exec api npx prisma migrate deploy` (no image rebuild — no new deps). Additive migration; existing data safe.
+- Added `.claude/skills/feature-wrapup/` skill to standardize post-feature documentation (learning deep-dive + journal + README index + this log + memory).
+- Next: Feature 10 (Scrum Board View) — board columns + drag-and-drop on `boardOrder`.
+
 ## Phase 1 Feature 8 (client workspaces) — 2026-07-30
 
 - Built Client Workspaces end-to-end on `feat/phase-1-clients`. **Backend:** `Client` + `AuditLog` models + migration `add_clients_and_audit`; 8 REST endpoints under `/api/v1/clients` (list, archived, create, get, update, delete, archive, unarchive); `.strict()` Zod DTOs + `validate` middleware; service is user-scoped (404-not-403), maps unique collisions → 409, `shortCode` immutable (absent from UpdateDto); first **audit-write infra** (append-only, fire-and-forget). 33 api tests green.
