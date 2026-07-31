@@ -22,3 +22,22 @@ export function validate(schema: ZodType) {
     next();
   };
 }
+
+// The query-string counterpart. In Express 5 `req.query` is a read-only getter,
+// so the parsed (coerced, defaulted) result is stashed on `res.locals.query`
+// for the controller to read, rather than reassigned onto the request.
+export function validateQuery(schema: ZodType) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.query);
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: result.error.flatten().fieldErrors
+      });
+    }
+
+    res.locals.query = result.data;
+    next();
+  };
+}

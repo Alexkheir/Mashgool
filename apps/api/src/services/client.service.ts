@@ -6,6 +6,9 @@ import type { CreateClientInput, UpdateClientInput } from '../dtos/client.dto';
 
 // The public shape of a client — an explicit whitelist so internal columns
 // (userId, taskCounter) can never leak into an API response by accident.
+// `openTaskCount` is the number of not-Done tasks, surfaced on the client card
+// (Feature 8 spec). It's populated on the list endpoints; mutation responses
+// return 0 and rely on the frontend refetching the list for the live figure.
 export interface ClientResponse {
   id: string;
   name: string;
@@ -13,11 +16,12 @@ export interface ClientResponse {
   description: string | null;
   color: string;
   isArchived: boolean;
+  openTaskCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-function toClientResponse(client: Client): ClientResponse {
+function toClientResponse(client: Client, openTaskCount = 0): ClientResponse {
   return {
     id: client.id,
     name: client.name,
@@ -25,10 +29,17 @@ function toClientResponse(client: Client): ClientResponse {
     description: client.description,
     color: client.color,
     isArchived: client.isArchived,
+    openTaskCount,
     createdAt: client.createdAt,
     updatedAt: client.updatedAt
   };
 }
+
+// A Prisma include that counts only the client's open (not-Done) tasks. Kept in
+// one place so the active and archived list queries stay in sync.
+const openTaskCountInclude = {
+  _count: { select: { tasks: { where: { status: { not: 'DONE' as const } } } } }
+} satisfies Prisma.ClientInclude;
 
 // Every read/write is scoped to the owner. A client the user doesn't own is
 // indistinguishable from one that doesn't exist — we return 404, never 403, so
@@ -70,17 +81,19 @@ function mapClientWriteError(err: unknown, shortCode?: string): unknown {
 export async function listClients(userId: string): Promise<ClientResponse[]> {
   const clients = await prisma.client.findMany({
     where: { userId, isArchived: false },
+    include: openTaskCountInclude,
     orderBy: { createdAt: 'asc' }
   });
-  return clients.map(toClientResponse);
+  return clients.map((client) => toClientResponse(client, client._count.tasks));
 }
 
 export async function listArchivedClients(userId: string): Promise<ClientResponse[]> {
   const clients = await prisma.client.findMany({
     where: { userId, isArchived: true },
+    include: openTaskCountInclude,
     orderBy: { updatedAt: 'desc' }
   });
-  return clients.map(toClientResponse);
+  return clients.map((client) => toClientResponse(client, client._count.tasks));
 }
 
 export async function getClient(

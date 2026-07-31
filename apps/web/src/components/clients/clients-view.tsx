@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   useArchiveClient,
   useArchivedClients,
@@ -15,9 +16,17 @@ import { ClientCard } from './client-card';
 import { Modal } from '@/components/ui/modal';
 
 export function ClientsView() {
+  const router = useRouter();
   const { data: clients, isLoading, isError } = useClients();
   const activeClientId = useUiStore((s) => s.activeClientId);
   const setActiveClient = useUiStore((s) => s.setActiveClient);
+
+  // Selecting a client opens its workspace; we also record it as active so the
+  // choice persists (ui.store) for future navigation.
+  function openClient(client: Client) {
+    setActiveClient(client.id);
+    router.push(`/dashboard/clients/${client.id}`);
+  }
 
   const archiveClient = useArchiveClient();
   const unarchiveClient = useUnarchiveClient();
@@ -84,7 +93,7 @@ export function ClientsView() {
               key={client.id}
               client={client}
               isActive={activeClientId === client.id}
-              onSelect={() => setActiveClient(client.id)}
+              onSelect={() => openClient(client)}
               onEdit={() => setEditing(client)}
               onArchive={() => archiveClient.mutate(client.id)}
               onDelete={() => setDeleting(client)}

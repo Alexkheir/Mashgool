@@ -3,9 +3,9 @@
 // Conventions (see CLAUDE.md): camelCase in TS, snake_case in the DB via
 // @map/@@map; all PKs are UUIDs; all timestamps are UTC. Tables are plural.
 //
-// The schema grows per feature. Feature 7 introduced `User`; Feature 8 adds
-// `Client` (workspaces) and `AuditLog` (append-only action trail). The `Task`
-// model — and Client's back-relation to it — arrives with Feature 9.
+// The schema grows per feature. Feature 7 introduced `User`; Feature 8 added
+// `Client` (workspaces) and `AuditLog` (append-only action trail). Feature 9
+// adds `Task` (and Client's back-relation to it).
 
 generator client {
   provider = "prisma-client-js"
@@ -53,13 +53,48 @@ model Client {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks Task[]
 
   @@unique([userId, name])
   @@unique([userId, shortCode])
   @@index([userId])
   @@index([userId, isArchived])
   @@map("clients")
+}
+
+// ─── TASK ────────────────────────────────────────────────────────────────────
+//
+// A unit of work inside a client workspace. `taskKey` is the immutable, per-client
+// human key (e.g. `BS-1`) — generated server-side from the client's `shortCode`
+// and an atomic increment of `Client.taskCounter` (see task-key.service.ts), so
+// concurrent creates never collide and deleted numbers are never reused. Tasks
+// are owned transitively through their client; every query is scoped by the
+// owning user via the `client` relation. `boardOrder` backs manual card ordering
+// on the Scrum board (Feature 10) — unused for now, defaults to 0.
+model Task {
+  id             String         @id @default(uuid())
+  clientId       String         @map("client_id")
+  taskKey        String         @map("task_key")
+  title          String
+  description    String?
+  notes          String?
+  status         TaskStatus     @default(TODO)
+  priority       Priority       @default(MEDIUM)
+  dueDate        DateTime?      @map("due_date")
+  boardOrder     Int            @default(0) @map("board_order")
+  creationMethod CreationMethod @default(MANUAL) @map("creation_method")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, taskKey])
+  @@index([clientId])
+  @@index([clientId, status])
+  @@index([clientId, dueDate])
+  @@index([clientId, priority])
+  @@map("tasks")
 }
 
 // ─── AUDIT LOG ───────────────────────────────────────────────────────────────
@@ -115,4 +150,34 @@ enum EntityType {
   TASK
 
   @@map("entity_type")
+}
+
+// Declaration order is significant: Postgres sorts an enum by the order its
+// labels are defined, and Prisma's `orderBy` inherits that. LOW→URGENT means an
+// ascending sort runs low-to-high and `desc` surfaces URGENT first (the natural
+// "most important on top" ordering).
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  BLOCKED
+
+  @@map("task_status")
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@map("priority")
+}
+
+enum CreationMethod {
+  MANUAL
+  PASTE_TO_TASK
+  VOICE_TO_TASK
+
+  @@map("creation_method")
 }
