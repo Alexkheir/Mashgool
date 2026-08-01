@@ -17,6 +17,7 @@ import {
   type Client
 } from '@/lib/use-clients';
 import { Modal } from '@/components/ui/modal';
+import { Button } from '@/components/ui/button';
 
 interface ClientFormProps {
   open: boolean;
@@ -26,7 +27,7 @@ interface ClientFormProps {
 }
 
 const inputClass =
-  'w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-950 outline-none focus:border-neutral-900';
+  'w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20';
 
 export function ClientForm({ open, onClose, client }: ClientFormProps) {
   const isEdit = Boolean(client);
@@ -179,7 +180,7 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
                 aria-pressed={color === swatch}
                 onClick={() => setColor(swatch)}
                 className={cn(
-                  'h-7 w-7 rounded-full ring-offset-2 transition',
+                  'h-8 w-8 rounded-lg ring-offset-2 transition hover:scale-110',
                   color === swatch && 'ring-2 ring-neutral-900'
                 )}
                 style={{ backgroundColor: swatch }}
@@ -191,20 +192,12 @@ export function ClientForm({ open, onClose, client }: ClientFormProps) {
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-          >
+          <Button variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-full bg-neutral-900 px-5 py-2 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={pending}>
             {pending ? 'Saving…' : isEdit ? 'Save changes' : 'Create client'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

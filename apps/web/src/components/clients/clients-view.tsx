@@ -14,6 +14,8 @@ import { useUiStore } from '@/lib/ui-store';
 import { ClientForm } from './client-form';
 import { ClientCard } from './client-card';
 import { Modal } from '@/components/ui/modal';
+import { Button } from '@/components/ui/button';
+import { PlusIcon } from '@/components/ui/icons';
 
 export function ClientsView() {
   const router = useRouter();
@@ -50,22 +52,23 @@ export function ClientsView() {
     });
   }
 
+  const totalOpen = clients?.reduce((sum, c) => sum + c.openTaskCount, 0) ?? 0;
+
   return (
-    <section className="mx-auto w-full max-w-5xl px-6 py-10">
-      <header className="mb-8 flex items-center justify-between">
+    <section className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+      <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-neutral-950">Clients</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Dashboard</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Each client is a workspace with its own task keys.
+            {clients && clients.length > 0
+              ? `${clients.length} workspace${clients.length === 1 ? '' : 's'} · ${totalOpen} open task${totalOpen === 1 ? '' : 's'}`
+              : 'Each client is a workspace with its own task keys.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
-        >
+        <Button onClick={() => setCreating(true)}>
+          <PlusIcon className="h-4 w-4" />
           New client
-        </button>
+        </Button>
       </header>
 
       {isLoading && <p className="text-sm text-neutral-500">Loading clients…</p>}
@@ -74,15 +77,16 @@ export function ClientsView() {
       )}
 
       {clients && clients.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-neutral-300 p-10 text-center">
+        <div className="animate-[rise-in] rounded-2xl border border-dashed border-neutral-300 bg-white/50 p-12 text-center">
           <p className="text-sm text-neutral-600">You don’t have any clients yet.</p>
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="mt-4 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
-          >
+          <p className="mx-auto mt-1 max-w-xs text-sm text-neutral-400">
+            A client is a workspace — its tasks get their own keys like{' '}
+            <span className="font-mono text-neutral-500">BS-1</span>.
+          </p>
+          <Button className="mt-5" onClick={() => setCreating(true)}>
+            <PlusIcon className="h-4 w-4" />
             Create your first client
-          </button>
+          </Button>
         </div>
       )}
 
@@ -155,21 +159,12 @@ export function ClientsView() {
           can’t be undone.
         </p>
         <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setDeleting(null)}
-            className="rounded-full px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-          >
+          <Button variant="ghost" onClick={() => setDeleting(null)}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={confirmDelete}
-            disabled={deleteClient.isPending}
-            className="rounded-full bg-red-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={deleteClient.isPending}>
             {deleteClient.isPending ? 'Deleting…' : 'Delete client'}
-          </button>
+          </Button>
         </div>
       </Modal>
     </section>

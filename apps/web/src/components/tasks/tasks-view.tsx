@@ -13,6 +13,8 @@ import {
 import { TaskRow } from './task-row';
 import { TaskForm } from './task-form';
 import { Modal } from '@/components/ui/modal';
+import { Button } from '@/components/ui/button';
+import { PlusIcon, ChevronLeftIcon } from '@/components/ui/icons';
 
 export function TasksView({ clientId }: { clientId: string }) {
   const client = useClient(clientId);
@@ -45,39 +47,39 @@ export function TasksView({ clientId }: { clientId: string }) {
   const tasks = data?.tasks ?? [];
 
   return (
-    <section className="mx-auto w-full max-w-5xl px-6 py-10">
+    <section className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
       <Link
         href="/dashboard"
-        className="text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
+        className="inline-flex items-center gap-1 text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
       >
-        ← All clients
+        <ChevronLeftIcon className="h-4 w-4" />
+        All clients
       </Link>
 
-      <header className="mt-4 mb-8 flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <header className="mt-4 mb-8 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
           {client.data && (
             <span
               aria-hidden="true"
-              className="h-3.5 w-3.5 shrink-0 rounded-full"
+              className="h-9 w-9 shrink-0 rounded-xl ring-2 ring-white"
               style={{ backgroundColor: client.data.color }}
             />
           )}
-          <h1 className="text-2xl font-semibold text-neutral-950">
-            {client.data?.name ?? 'Workspace'}
-          </h1>
-          {client.data && (
-            <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-mono text-xs font-medium text-neutral-600">
-              {client.data.shortCode}
-            </span>
-          )}
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-neutral-900">
+              <span className="truncate">{client.data?.name ?? 'Workspace'}</span>
+              {client.data && (
+                <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 font-mono text-xs font-medium text-neutral-500">
+                  {client.data.shortCode}
+                </span>
+              )}
+            </h1>
+          </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
-        >
+        <Button onClick={() => setCreating(true)}>
+          <PlusIcon className="h-4 w-4" />
           New task
-        </button>
+        </Button>
       </header>
 
       {/* Toolbar: task total + sort. */}
@@ -90,7 +92,7 @@ export function TasksView({ clientId }: { clientId: string }) {
           <select
             value={sortBy}
             onChange={(e) => onSortChange(e.target.value as SortField)}
-            className="rounded-lg border border-neutral-300 px-2 py-1.5 text-sm text-neutral-950 outline-none focus:border-neutral-900"
+            className="rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-sm text-neutral-900 shadow-sm outline-none transition focus:border-brand-400"
           >
             {SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -107,15 +109,12 @@ export function TasksView({ clientId }: { clientId: string }) {
       )}
 
       {data && tasks.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-neutral-300 p-10 text-center">
+        <div className="animate-[rise-in] rounded-2xl border border-dashed border-neutral-300 bg-white/50 p-12 text-center">
           <p className="text-sm text-neutral-600">No tasks in this workspace yet.</p>
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="mt-4 rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800"
-          >
+          <Button className="mt-5" onClick={() => setCreating(true)}>
+            <PlusIcon className="h-4 w-4" />
             Create the first task
-          </button>
+          </Button>
         </div>
       )}
 
@@ -137,25 +136,25 @@ export function TasksView({ clientId }: { clientId: string }) {
       {/* Pagination — only when there's more than one page. */}
       {data && data.totalPages > 1 && (
         <div className="mt-6 flex items-center justify-center gap-4 text-sm">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="rounded-full border border-neutral-300 px-4 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-40"
           >
             ← Prev
-          </button>
+          </Button>
           <span className="text-neutral-500">
             Page {data.page} of {data.totalPages}
           </span>
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => (data && p < data.totalPages ? p + 1 : p))}
             disabled={page >= data.totalPages}
-            className="rounded-full border border-neutral-300 px-4 py-1.5 font-medium text-neutral-700 transition hover:bg-neutral-100 disabled:opacity-40"
           >
             Next →
-          </button>
+          </Button>
         </div>
       )}
 
@@ -179,21 +178,12 @@ export function TasksView({ clientId }: { clientId: string }) {
           is permanent, and its key is retired for good. This can’t be undone.
         </p>
         <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setDeleting(null)}
-            className="rounded-full px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-100"
-          >
+          <Button variant="ghost" onClick={() => setDeleting(null)}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={confirmDelete}
-            disabled={deleteTask.isPending}
-            className="rounded-full bg-red-600 px-5 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={deleteTask.isPending}>
             {deleteTask.isPending ? 'Deleting…' : 'Delete task'}
-          </button>
+          </Button>
         </div>
       </Modal>
     </section>
