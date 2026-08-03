@@ -62,31 +62,37 @@ export function ClientCard({
         }
       }}
       className={cn(
-        'group flex flex-col rounded-2xl border bg-white p-5 text-left shadow-sm transition',
-        'hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900',
-        isActive ? 'border-neutral-900 ring-1 ring-neutral-900' : 'border-neutral-200'
+        'group flex flex-col rounded-2xl border bg-surface p-5 text-left shadow-[var(--shadow-card)] transition duration-200',
+        'hover:-translate-y-0.5 hover:shadow-[var(--shadow-card-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
+        isActive ? 'border-brand-300 ring-1 ring-brand-200' : 'border-neutral-200/80'
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <span
             aria-hidden="true"
-            className="h-3 w-3 shrink-0 rounded-full"
+            className="h-8 w-8 shrink-0 rounded-lg ring-2 ring-white"
             style={{ backgroundColor: client.color }}
           />
-          <h3 className="font-medium text-neutral-950">{client.name}</h3>
+          <h3 className="truncate font-semibold text-neutral-900">{client.name}</h3>
         </div>
-        <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 font-mono text-xs font-medium text-neutral-600">
+        <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 font-mono text-xs font-medium text-neutral-500">
           {client.shortCode}
         </span>
       </div>
 
       {client.description && (
-        <p className="mt-2 line-clamp-2 text-sm text-neutral-500">{client.description}</p>
+        <p className="mt-3 line-clamp-2 text-sm text-neutral-500">{client.description}</p>
       )}
 
       <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-3">
-        <span className="text-xs text-neutral-400">
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500">
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              client.openTaskCount > 0 ? 'bg-brand-500' : 'bg-neutral-300'
+            )}
+          />
           {client.openTaskCount} open {client.openTaskCount === 1 ? 'task' : 'tasks'}
         </span>
         <div className="flex items-center gap-1">

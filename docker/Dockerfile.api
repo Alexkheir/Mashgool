@@ -19,6 +19,14 @@ RUN npm ci --workspace=apps/api
 FROM deps AS dev
 WORKDIR /repo/apps/api
 ENV NODE_ENV=development
+# Bake the Prisma client + query engine into the image at build time. Without
+# this, the `predev` hook downloads the engine from Prisma's binary CDN on every
+# container start — so a CDN hiccup (they run a flaky failover) breaks startup,
+# the healthcheck never passes, and Compose tears the stack down. Generating here
+# caches the engine in the image; the runtime `predev` generate then finds it and
+# skips the network fetch. Mirrors what the prod-deps stage already does.
+COPY apps/api/prisma ./prisma
+RUN npx prisma generate --schema=./prisma/schema.prisma
 EXPOSE 4000
 CMD ["npm", "run", "dev"]
 

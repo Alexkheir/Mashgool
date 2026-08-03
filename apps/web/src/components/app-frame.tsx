@@ -4,10 +4,12 @@ import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { authQueryKey, logout, useAuth } from '@/lib/use-auth';
+import { AppSidebar, Avatar } from '@/components/app-sidebar';
+import { LogoMark, LogoutIcon } from '@/components/ui/icons';
 
-// The signed-in app shell: a client-side auth guard plus the top bar (user +
-// logout). Extracted from the dashboard so every authed page — the client grid
-// and each client workspace — shares one guard and one header.
+// The signed-in app shell: a client-side auth guard wrapping the two-part layout
+// — the persistent sidebar (desktop) and the main content column. A compact top
+// bar stands in for the sidebar on mobile so identity + logout stay reachable.
 export function AppFrame({ children }: { children: ReactNode }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -28,14 +30,18 @@ export function AppFrame({ children }: { children: ReactNode }) {
   }
 
   if (isLoading) {
-    return <p className="p-6 text-sm text-neutral-500">Loading…</p>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <p className="text-sm text-neutral-500">Loading…</p>
+      </div>
+    );
   }
 
   if (isError) {
     return (
-      <p className="p-6 text-sm text-red-600">
-        Couldn’t load your session. Please try again.
-      </p>
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <p className="text-sm text-red-600">Couldn’t load your session. Please try again.</p>
+      </div>
     );
   }
 
@@ -44,36 +50,31 @@ export function AppFrame({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-neutral-200 px-6 py-4">
-        <div className="flex items-center gap-3">
-          {user.avatarUrl ? (
-            <img
-              src={user.avatarUrl}
-              alt=""
-              className="h-9 w-9 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-neutral-900 text-sm font-medium text-white">
-              {user.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <div className="leading-tight">
-            <p className="text-sm font-medium text-neutral-950">{user.name}</p>
-            <p className="text-xs text-neutral-500">{user.email}</p>
+    <div className="flex min-h-screen bg-canvas">
+      <AppSidebar user={user} onLogout={handleLogout} />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile-only top bar (the sidebar is hidden below md). */}
+        <header className="flex items-center justify-between border-b border-neutral-200/70 bg-sidebar px-4 py-3 md:hidden">
+          <div className="flex items-center gap-2">
+            <LogoMark className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white" />
+            <span className="text-sm font-semibold text-neutral-900">Mashgool</span>
           </div>
-        </div>
+          <div className="flex items-center gap-2">
+            <Avatar user={user} />
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Log out"
+              className="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-100 hover:text-neutral-700"
+            >
+              <LogoutIcon className="h-[18px] w-[18px]" />
+            </button>
+          </div>
+        </header>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="rounded-full border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
-        >
-          Log out
-        </button>
-      </header>
-
-      {children}
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }
