@@ -73,13 +73,18 @@ export function useTasks(
 
 // ─── Mutations ──────────────────────────────────────────────────────────────────
 
-// Task mutations also change a client's open-task count, so both subtrees are
-// invalidated: the task lists and the client list (which carries the count).
+// A task mutation ripples through three caches: the task lists, the board (the
+// same tasks grouped into columns), and the client list (which carries the
+// open-task count). The board key is spelled out rather than imported from
+// use-board — that module imports `taskKeys` from here, and a shared literal
+// avoids a circular import for the sake of one constant. It must stay in step
+// with `boardKeys.all`.
 function useInvalidateTasks() {
   const queryClient = useQueryClient();
   return () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: taskKeys.all }),
+      queryClient.invalidateQueries({ queryKey: ['board'] }),
       queryClient.invalidateQueries({ queryKey: clientKeys.all })
     ]);
 }

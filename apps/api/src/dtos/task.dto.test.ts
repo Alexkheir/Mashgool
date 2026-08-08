@@ -3,6 +3,7 @@ import {
   CreateTaskDto,
   UpdateTaskDto,
   ChangeStatusDto,
+  MoveTaskDto,
   ListTasksQueryDto
 } from './task.dto';
 
@@ -87,6 +88,31 @@ describe('ChangeStatusDto', () => {
     expect(ChangeStatusDto.parse({ status: 'DONE' })).toEqual({ status: 'DONE' });
     expect(ChangeStatusDto.safeParse({ status: 'DONE', foo: 1 }).success).toBe(false);
     expect(ChangeStatusDto.safeParse({}).success).toBe(false);
+  });
+});
+
+describe('MoveTaskDto', () => {
+  it('accepts a destination column and a 0-based position', () => {
+    expect(MoveTaskDto.parse({ status: 'IN_PROGRESS', position: 0 })).toEqual({
+      status: 'IN_PROGRESS',
+      position: 0
+    });
+  });
+
+  it('requires both fields — a drop is meaningless without either', () => {
+    expect(MoveTaskDto.safeParse({ status: 'DONE' }).success).toBe(false);
+    expect(MoveTaskDto.safeParse({ position: 2 }).success).toBe(false);
+  });
+
+  it('rejects a negative or fractional position', () => {
+    expect(MoveTaskDto.safeParse({ status: 'DONE', position: -1 }).success).toBe(false);
+    expect(MoveTaskDto.safeParse({ status: 'DONE', position: 1.5 }).success).toBe(false);
+  });
+
+  it('rejects unknown fields', () => {
+    expect(
+      MoveTaskDto.safeParse({ status: 'DONE', position: 0, clientId: 'c2' }).success
+    ).toBe(false);
   });
 });
 

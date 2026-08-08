@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Drive Prisma, the audit writer, and the task-key generator entirely through
-// mocks — no DB, no side effects. `$transaction` is stubbed to invoke its
-// callback with a tx object exposing the one method createTask uses.
+// mocks — no DB, no side effects. `$transaction` hands its callback a tx client
+// backed by the *same* task mocks as the top-level client, so an assertion reads
+// the same whether the service ran the query inside a transaction or outside it.
 const {
   mockClientFindFirst,
   mockTaskFindFirst,
@@ -10,7 +11,8 @@ const {
   mockTaskCount,
   mockTaskCreate,
   mockTaskUpdate,
-  mockTaskDelete
+  mockTaskDelete,
+  mockTaskAggregate
 } = vi.hoisted(() => ({
   mockClientFindFirst: vi.fn(),
   mockTaskFindFirst: vi.fn(),
@@ -18,26 +20,30 @@ const {
   mockTaskCount: vi.fn(),
   mockTaskCreate: vi.fn(),
   mockTaskUpdate: vi.fn(),
-  mockTaskDelete: vi.fn()
+  mockTaskDelete: vi.fn(),
+  mockTaskAggregate: vi.fn()
 }));
 const mockWriteAuditLog = vi.hoisted(() => vi.fn());
 const mockGenerateTaskKey = vi.hoisted(() => vi.fn());
 
-vi.mock('../lib/prisma', () => ({
-  prisma: {
-    client: { findFirst: mockClientFindFirst },
-    task: {
-      findFirst: mockTaskFindFirst,
-      findMany: mockTaskFindMany,
-      count: mockTaskCount,
-      update: mockTaskUpdate,
-      delete: mockTaskDelete
-    },
-    // Interactive transaction: hand the callback a tx that can create a task.
-    $transaction: (fn: (tx: unknown) => unknown) =>
-      Promise.resolve(fn({ task: { create: mockTaskCreate } }))
-  }
-}));
+vi.mock('../lib/prisma', () => {
+  const task = {
+    findFirst: mockTaskFindFirst,
+    findMany: mockTaskFindMany,
+    count: mockTaskCount,
+    create: mockTaskCreate,
+    update: mockTaskUpdate,
+    delete: mockTaskDelete,
+    aggregate: mockTaskAggregate
+  };
+  return {
+    prisma: {
+      client: { findFirst: mockClientFindFirst },
+      task,
+      $transaction: (fn: (tx: unknown) => unknown) => Promise.resolve(fn({ task }))
+    }
+  };
+});
 
 vi.mock('./audit.service', () => ({ writeAuditLog: mockWriteAuditLog }));
 vi.mock('./task-key.service', () => ({ generateTaskKey: mockGenerateTaskKey }));
@@ -68,6 +74,9 @@ function fakeTask(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Every write path that places a card in a column asks for the column's
+  // current max boardOrder; default to an empty column unless a test says else.
+  mockTaskAggregate.mockResolvedValue({ _max: { boardOrder: null } });
 });
 
 describe('createTask', () => {
@@ -211,13 +220,159 @@ describe('changeTaskStatus', () => {
 
     await taskService.changeTaskStatus(USER, 't1', 'DONE');
 
-    expect(mockTaskUpdate).toHaveBeenCalledWith({ where: { id: 't1' }, data: { status: 'DONE' } });
+    expect(mockTaskUpdate).toHaveBeenCalledWith({
+      where: { id: 't1' },
+      data: { status: 'DONE', boardOrder: 0 }
+    });
     expect(mockWriteAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'TASK_STATUS_CHANGED',
         metadata: expect.objectContaining({ from: 'TODO', to: 'DONE' })
       })
     );
+  });
+
+  it('appends the card to the bottom of the destination column', async () => {
+    mockTaskFindFirst.mockResolvedValue(fakeTask({ status: 'TODO' }));
+    mockTaskAggregate.mockResolvedValue({ _max: { boardOrder: 4 } });
+    mockTaskUpdate.mockResolvedValue(fakeTask({ status: 'DONE' }));
+
+    await taskService.changeTaskStatus(USER, 't1', 'DONE');
+
+    expect(mockTaskUpdate).toHaveBeenCalledWith({
+      where: { id: 't1' },
+      data: { status: 'DONE', boardOrder: 5 }
+    });
+  });
+});
+
+describe('getClientBoard / getGlobalBoard', () => {
+  it('returns all four columns, empty ones included', async () => {
+    mockClientFindFirst.mockResolvedValue({ id: CLIENT });
+    mockTaskFindMany.mockResolvedValue([]);
+
+    const columns = await taskService.getClientBoard(USER, CLIENT);
+
+    expect(Object.keys(columns).sort()).toEqual(
+      ['BLOCKED', 'DONE', 'IN_PROGRESS', 'TODO'].sort()
+    );
+    expect(columns.TODO).toEqual([]);
+    // One query per column, each capped and ordered by manual board order.
+    expect(mockTaskFindMany).toHaveBeenCalledTimes(4);
+    expect(mockTaskFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ boardOrder: 'asc' }, { createdAt: 'desc' }],
+        take: 200
+      })
+    );
+  });
+
+  it('attaches the owning client to every card', async () => {
+    mockClientFindFirst.mockResolvedValue({ id: CLIENT });
+    const client = { id: CLIENT, name: 'Brand Studio', shortCode: 'BS', color: '#4A90D9' };
+    mockTaskFindMany.mockResolvedValue([{ ...fakeTask(), client }]);
+
+    const columns = await taskService.getClientBoard(USER, CLIENT);
+
+    expect(columns.TODO[0]).toMatchObject({ taskKey: 'BS-1', client });
+  });
+
+  it('returns 404 for a client the user does not own', async () => {
+    mockClientFindFirst.mockResolvedValue(null);
+    await expect(taskService.getClientBoard(USER, 'other')).rejects.toMatchObject({
+      statusCode: 404
+    });
+    expect(mockTaskFindMany).not.toHaveBeenCalled();
+  });
+
+  it('scopes the global board to the user and skips archived workspaces', async () => {
+    mockTaskFindMany.mockResolvedValue([]);
+
+    await taskService.getGlobalBoard(USER);
+
+    expect(mockTaskFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ client: { userId: USER, isArchived: false } })
+      })
+    );
+  });
+});
+
+describe('moveTask', () => {
+  it('inserts the card at the requested index and renumbers the column', async () => {
+    mockTaskFindFirst.mockResolvedValue(fakeTask({ status: 'TODO' }));
+    // Destination column without the moved card: a, b, c at 0, 1, 2.
+    mockTaskFindMany.mockResolvedValue([
+      { id: 'a', boardOrder: 0 },
+      { id: 'b', boardOrder: 1 },
+      { id: 'c', boardOrder: 2 }
+    ]);
+    mockTaskUpdate.mockResolvedValue(fakeTask({ status: 'IN_PROGRESS', boardOrder: 1 }));
+
+    await taskService.moveTask(USER, 't1', { status: 'IN_PROGRESS', position: 1 });
+
+    // 'a' already sits at index 0, so it is left alone; t1 takes 1 (plus the new
+    // status), pushing b → 2 and c → 3.
+    expect(mockTaskUpdate).toHaveBeenCalledTimes(3);
+    expect(mockTaskUpdate).toHaveBeenCalledWith({
+      where: { id: 't1' },
+      data: { boardOrder: 1, status: 'IN_PROGRESS' }
+    });
+    expect(mockTaskUpdate).toHaveBeenCalledWith({ where: { id: 'b' }, data: { boardOrder: 2 } });
+    expect(mockTaskUpdate).toHaveBeenCalledWith({ where: { id: 'c' }, data: { boardOrder: 3 } });
+  });
+
+  it('excludes the moved card from the destination column it is reordering within', async () => {
+    mockTaskFindFirst.mockResolvedValue(fakeTask({ status: 'TODO' }));
+    mockTaskFindMany.mockResolvedValue([]);
+    mockTaskUpdate.mockResolvedValue(fakeTask());
+
+    await taskService.moveTask(USER, 't1', { status: 'TODO', position: 0 });
+
+    expect(mockTaskFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { clientId: CLIENT, status: 'TODO', id: { not: 't1' } }
+      })
+    );
+  });
+
+  it('clamps a position past the end of the column instead of failing', async () => {
+    mockTaskFindFirst.mockResolvedValue(fakeTask({ status: 'TODO' }));
+    mockTaskFindMany.mockResolvedValue([{ id: 'a', boardOrder: 0 }]);
+    mockTaskUpdate.mockResolvedValue(fakeTask({ status: 'DONE' }));
+
+    await taskService.moveTask(USER, 't1', { status: 'DONE', position: 99 });
+
+    expect(mockTaskUpdate).toHaveBeenCalledWith({
+      where: { id: 't1' },
+      data: { boardOrder: 1, status: 'DONE' }
+    });
+  });
+
+  it('audits a column change but stays silent on a same-column reorder', async () => {
+    mockTaskFindFirst.mockResolvedValue(fakeTask({ status: 'TODO' }));
+    mockTaskFindMany.mockResolvedValue([]);
+    mockTaskUpdate.mockResolvedValue(fakeTask({ status: 'TODO' }));
+
+    await taskService.moveTask(USER, 't1', { status: 'TODO', position: 0 });
+    expect(mockWriteAuditLog).not.toHaveBeenCalled();
+
+    mockTaskUpdate.mockResolvedValue(fakeTask({ status: 'BLOCKED' }));
+    await taskService.moveTask(USER, 't1', { status: 'BLOCKED', position: 0 });
+    expect(mockWriteAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'TASK_STATUS_CHANGED',
+        metadata: expect.objectContaining({ from: 'TODO', to: 'BLOCKED', via: 'board' })
+      })
+    );
+  });
+
+  it('returns 404 and never writes when the task is not owned', async () => {
+    mockTaskFindFirst.mockResolvedValue(null);
+    await expect(
+      taskService.moveTask(USER, 't1', { status: 'DONE', position: 0 })
+    ).rejects.toMatchObject({ statusCode: 404 });
+    expect(mockTaskUpdate).not.toHaveBeenCalled();
   });
 });
 

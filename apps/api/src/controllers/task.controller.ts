@@ -25,6 +25,28 @@ export async function createTask(req: Request, res: Response) {
   res.status(201).json({ task });
 }
 
+export async function getClientBoard(req: Request, res: Response) {
+  const columns = await taskService.getClientBoard(
+    req.user!.id,
+    req.params.clientId as string
+  );
+  res.status(200).json({ columns });
+}
+
+export async function getGlobalBoard(req: Request, res: Response) {
+  const columns = await taskService.getGlobalBoard(req.user!.id);
+  res.status(200).json({ columns });
+}
+
+export async function moveTask(req: Request, res: Response) {
+  const task = await taskService.moveTask(
+    req.user!.id,
+    req.params.taskId as string,
+    req.body
+  );
+  res.status(200).json({ task });
+}
+
 export async function getTask(req: Request, res: Response) {
   const task = await taskService.getTask(req.user!.id, req.params.taskId as string);
   res.status(200).json({ task });
