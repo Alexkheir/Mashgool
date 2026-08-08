@@ -75,6 +75,57 @@ export const MoveTaskDto = z
   })
   .strict();
 
+// ─── Filters (Feature 11) ────────────────────────────────────────────────────
+//
+// The filter bar's parsed query arrives as ordinary query params. An *absent*
+// param and an *empty* one mean the same thing — no filter — so empty strings
+// are normalised away before validation rather than failing as "not one of the
+// allowed values".
+function optionalParam<T extends z.ZodType>(schema: T) {
+  return z.preprocess((v) => (v === '' ? undefined : v), schema.optional());
+}
+
+// Multi-value filters travel comma-separated (`status=TODO,BLOCKED`) because a
+// query string has no native list type. Values are upper-cased first so the bar
+// can accept the lowercase spellings the spec uses (`status = blocked`).
+function csvEnum<T extends readonly [string, ...string[]]>(values: T) {
+  return optionalParam(
+    z
+      .string()
+      .transform((v) =>
+        v
+          .split(',')
+          .map((s) => s.trim().toUpperCase())
+          .filter(Boolean)
+      )
+      .pipe(z.array(z.enum(values)).min(1))
+  );
+}
+
+// `SHORTCODE-N`, case-insensitive. The short code is 2–5 letters *or digits*
+// (see client.dto.ts) — the tech-spec sample's `[A-Z]{2,5}` would reject the
+// perfectly legal code `A1`.
+export const TASK_KEY_PATTERN = /^[A-Z0-9]{2,5}-\d+$/i;
+
+// The filter fields shared by the list and both boards, so one filter bar drives
+// every view and there is a single definition of what a filter may contain.
+const taskFilterFields = {
+  // Partial, case-insensitive match on the client's name (spec: "partial match
+  // supported"). Only meaningful on the global board, but harmless elsewhere.
+  client: optionalParam(z.string().trim().min(1).max(100)),
+  status: csvEnum(TASK_STATUSES),
+  priority: csvEnum(TASK_PRIORITIES),
+  due: optionalParam(z.enum(['today', 'this-week'])),
+  // An exact task-key lookup. Normalised to upper case so `bs-12` finds `BS-12`.
+  taskKey: optionalParam(
+    z
+      .string()
+      .trim()
+      .regex(TASK_KEY_PATTERN, 'Not a valid task key')
+      .transform((v) => v.toUpperCase())
+  )
+};
+
 // List query params arrive as strings, so page is coerced. Sort is limited to
 // the three fields the spec allows; direction is optional and defaults per-field
 // in the service. Not `.strict()` — unknown query params (e.g. a cache-buster)
@@ -82,11 +133,17 @@ export const MoveTaskDto = z
 export const ListTasksQueryDto = z.object({
   page: z.coerce.number().int().min(1).default(1),
   sortBy: z.enum(['dueDate', 'priority', 'createdAt']).default('createdAt'),
-  order: z.enum(['asc', 'desc']).optional()
+  order: z.enum(['asc', 'desc']).optional(),
+  ...taskFilterFields
 });
+
+// The board takes the same filters but none of the list's paging/sorting — its
+// shape is fixed (four columns, manual order).
+export const BoardQueryDto = z.object(taskFilterFields);
 
 export type CreateTaskInput = z.infer<typeof CreateTaskDto>;
 export type UpdateTaskInput = z.infer<typeof UpdateTaskDto>;
 export type ChangeStatusInput = z.infer<typeof ChangeStatusDto>;
 export type MoveTaskInput = z.infer<typeof MoveTaskDto>;
 export type ListTasksQuery = z.infer<typeof ListTasksQueryDto>;
+export type TaskFilters = z.infer<typeof BoardQueryDto>;

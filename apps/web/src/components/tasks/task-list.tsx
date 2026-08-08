@@ -1,14 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SORT_OPTIONS, type SortField } from '@/dtos/task.dto';
 import { useTasks, useChangeTaskStatus, type Task } from '@/lib/use-tasks';
+import { hasActiveFilters, type TaskFilters } from '@/lib/filter-parser';
 import { Button } from '@/components/ui/button';
 import { PlusIcon } from '@/components/ui/icons';
+import { NoResults } from '@/components/shared/no-results';
 import { TaskRow } from './task-row';
 
 interface TaskListProps {
   clientId: string;
+  filters: TaskFilters;
+  onClearFilters: () => void;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
   onCreate: () => void;
@@ -18,15 +22,33 @@ interface TaskListProps {
 // TasksView when the board arrived (Feature 10) so the two views are siblings —
 // the workspace header, the create/edit/delete modals, and the view toggle live
 // in the parent and are shared by both.
-export function TaskList({ clientId, onEdit, onDelete, onCreate }: TaskListProps) {
+export function TaskList({
+  clientId,
+  filters,
+  onClearFilters,
+  onEdit,
+  onDelete,
+  onCreate
+}: TaskListProps) {
   // Sort field is chosen here; the server applies a sensible default direction
   // per field (soonest-due, highest-priority, newest-created). Changing the sort
   // resets pagination to page 1 (Feature 9 spec).
   const [sortBy, setSortBy] = useState<SortField>('createdAt');
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, isError, isPlaceholderData } = useTasks(clientId, { page, sortBy });
+  const { data, isLoading, isError, isPlaceholderData } = useTasks(clientId, {
+    page,
+    sortBy,
+    filters
+  });
   const changeStatus = useChangeTaskStatus();
+
+  // "Pagination resets to page 1 when filters or sort order change" — the sort
+  // path does it inline; filters arrive as a prop, so they need an effect.
+  // Without this, filtering while on page 3 shows an empty page.
+  useEffect(() => {
+    setPage(1);
+  }, [filters]);
 
   function onSortChange(value: SortField) {
     setSortBy(value);
@@ -34,6 +56,7 @@ export function TaskList({ clientId, onEdit, onDelete, onCreate }: TaskListProps
   }
 
   const tasks = data?.tasks ?? [];
+  const filtered = hasActiveFilters(filters);
 
   return (
     <>
@@ -61,7 +84,11 @@ export function TaskList({ clientId, onEdit, onDelete, onCreate }: TaskListProps
       {isLoading && <p className="text-sm text-neutral-500">Loading tasks…</p>}
       {isError && <p className="text-sm text-red-600">Couldn’t load tasks. Please refresh.</p>}
 
-      {data && tasks.length === 0 && (
+      {data && tasks.length === 0 && filtered && (
+        <NoResults filters={filters} onClear={onClearFilters} />
+      )}
+
+      {data && tasks.length === 0 && !filtered && (
         <div className="animate-[rise-in] rounded-2xl border border-dashed border-neutral-300 bg-white/50 p-12 text-center">
           <p className="text-sm text-neutral-600">No tasks in this workspace yet.</p>
           <Button className="mt-5" onClick={onCreate}>

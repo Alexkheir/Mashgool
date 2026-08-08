@@ -12,7 +12,9 @@ import {
 } from '@/lib/use-clients';
 import { cn } from '@/lib/utils';
 import { GLOBAL_SCOPE, useUiStore, useViewMode } from '@/lib/ui-store';
+import { useFilterQuery } from '@/lib/filter-store';
 import { useDeleteTask, type Task } from '@/lib/use-tasks';
+import { FilterBar } from '@/components/shared/filter-bar';
 import { ClientForm } from './client-form';
 import { ClientCard } from './client-card';
 import { GlobalBoard } from '@/components/board/global-board';
@@ -32,6 +34,7 @@ export function ClientsView() {
   // workspace (Feature 10 "Global Board View"). The dashboard isn't a client, so
   // its choice is stored under the reserved global scope.
   const viewMode = useViewMode(GLOBAL_SCOPE);
+  const filter = useFilterQuery(GLOBAL_SCOPE);
 
   // Selecting a client opens its workspace; we also record it as active so the
   // choice persists (ui.store) for future navigation.
@@ -102,7 +105,18 @@ export function ClientsView() {
         </div>
       </header>
 
-      {boardView && <GlobalBoard onOpenTask={setEditingTask} />}
+      {/* The filter bar belongs to the board: the grid below it shows *clients*,
+          not tasks, so status/priority/due have nothing to act on there. */}
+      {boardView && (
+        <>
+          <FilterBar filter={filter} showClientHint />
+          <GlobalBoard
+            filters={filter.filters}
+            onClearFilters={filter.clear}
+            onOpenTask={setEditingTask}
+          />
+        </>
+      )}
 
       {!boardView && isLoading && <p className="text-sm text-neutral-500">Loading clients…</p>}
       {!boardView && isError && (

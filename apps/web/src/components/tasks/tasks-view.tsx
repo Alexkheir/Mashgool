@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useClient } from '@/lib/use-clients';
 import { useDeleteTask, type Task } from '@/lib/use-tasks';
 import { useViewMode } from '@/lib/ui-store';
+import { useFilterQuery } from '@/lib/filter-store';
 import type { TaskStatus } from '@/dtos/task.dto';
 import { TaskList } from './task-list';
 import { TaskForm } from './task-form';
 import { ClientBoard } from '@/components/board/client-board';
+import { FilterBar } from '@/components/shared/filter-bar';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { ViewToggle } from '@/components/ui/view-toggle';
@@ -21,6 +23,9 @@ import { PlusIcon, ChevronLeftIcon } from '@/components/ui/icons';
 export function TasksView({ clientId }: { clientId: string }) {
   const client = useClient(clientId);
   const viewMode = useViewMode(clientId);
+  // Scoped to this workspace, so each client keeps its own filters, and they
+  // survive a board/list toggle but not navigating away (Feature 11 spec).
+  const filter = useFilterQuery(clientId);
 
   const deleteTask = useDeleteTask();
 
@@ -72,9 +77,15 @@ export function TasksView({ clientId }: { clientId: string }) {
         </div>
       </header>
 
+      {/* Persistent across both views — the bar sits above the switch, so a
+          filter carries over when the user toggles board ↔ list. */}
+      <FilterBar filter={filter} />
+
       {viewMode === 'board' ? (
         <ClientBoard
           clientId={clientId}
+          filters={filter.filters}
+          onClearFilters={filter.clear}
           onOpenTask={setEditing}
           // The "+" on a column creates a task already in that column's status.
           onAddTask={(status) => setCreating({ status })}
@@ -83,6 +94,8 @@ export function TasksView({ clientId }: { clientId: string }) {
       ) : (
         <TaskList
           clientId={clientId}
+          filters={filter.filters}
+          onClearFilters={filter.clear}
           onEdit={setEditing}
           onDelete={setDeleting}
           onCreate={() => setCreating({})}

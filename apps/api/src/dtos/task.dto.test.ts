@@ -4,7 +4,8 @@ import {
   UpdateTaskDto,
   ChangeStatusDto,
   MoveTaskDto,
-  ListTasksQueryDto
+  ListTasksQueryDto,
+  BoardQueryDto
 } from './task.dto';
 
 // `YYYY-MM-DD` (UTC) offset from today by `deltaDays` — keeps the past/future
@@ -118,11 +119,62 @@ describe('MoveTaskDto', () => {
 
 describe('ListTasksQueryDto', () => {
   it('coerces the page string and applies defaults', () => {
-    expect(ListTasksQueryDto.parse({ page: '3' })).toEqual({ page: 3, sortBy: 'createdAt' });
-    expect(ListTasksQueryDto.parse({})).toEqual({ page: 1, sortBy: 'createdAt' });
+    expect(ListTasksQueryDto.parse({ page: '3' })).toMatchObject({ page: 3, sortBy: 'createdAt' });
+    expect(ListTasksQueryDto.parse({})).toMatchObject({ page: 1, sortBy: 'createdAt' });
   });
 
   it('rejects an unsupported sort field', () => {
     expect(ListTasksQueryDto.safeParse({ sortBy: 'title' }).success).toBe(false);
+  });
+
+  it('carries the same filters as the board', () => {
+    expect(ListTasksQueryDto.parse({ status: 'blocked' })).toMatchObject({
+      status: ['BLOCKED']
+    });
+  });
+});
+
+describe('BoardQueryDto (filters)', () => {
+  it('parses an unfiltered query to an empty object', () => {
+    expect(BoardQueryDto.parse({})).toEqual({});
+  });
+
+  it('splits comma-separated values and upper-cases them', () => {
+    expect(BoardQueryDto.parse({ status: 'todo,blocked' }).status).toEqual(['TODO', 'BLOCKED']);
+    expect(BoardQueryDto.parse({ priority: 'urgent' }).priority).toEqual(['URGENT']);
+  });
+
+  it('treats an empty param the same as an absent one', () => {
+    // The filter bar clears a field by sending it empty; that must not 400.
+    expect(BoardQueryDto.parse({ status: '', client: '', taskKey: '' })).toEqual({});
+  });
+
+  it('rejects a value outside the enum', () => {
+    expect(BoardQueryDto.safeParse({ status: 'todo,nonsense' }).success).toBe(false);
+    expect(BoardQueryDto.safeParse({ due: 'next-year' }).success).toBe(false);
+  });
+
+  it('accepts both due windows', () => {
+    expect(BoardQueryDto.parse({ due: 'today' }).due).toBe('today');
+    expect(BoardQueryDto.parse({ due: 'this-week' }).due).toBe('this-week');
+  });
+
+  it('normalises a task key to upper case', () => {
+    expect(BoardQueryDto.parse({ taskKey: 'bs-12' }).taskKey).toBe('BS-12');
+  });
+
+  it('accepts a short code containing digits', () => {
+    // The tech-spec sample pattern was [A-Z]{2,5}, which would reject this even
+    // though client.dto.ts allows digits in a short code.
+    expect(BoardQueryDto.parse({ taskKey: 'A1-3' }).taskKey).toBe('A1-3');
+  });
+
+  it('rejects something that is not a task key', () => {
+    expect(BoardQueryDto.safeParse({ taskKey: 'not a key' }).success).toBe(false);
+    expect(BoardQueryDto.safeParse({ taskKey: 'BS-' }).success).toBe(false);
+  });
+
+  it('keeps a client name partial and untouched', () => {
+    expect(BoardQueryDto.parse({ client: '  Brand Studio ' }).client).toBe('Brand Studio');
   });
 });

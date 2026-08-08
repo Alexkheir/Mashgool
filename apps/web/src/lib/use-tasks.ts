@@ -10,6 +10,7 @@ import {
 import { request } from './use-clients';
 import { clientKeys } from './use-clients';
 import type { CreateTaskInput, UpdateTaskInput, TaskStatus, SortField } from '@/dtos/task.dto';
+import { filtersToSearchParams, type TaskFilters } from './filter-parser';
 
 // The server's public task shape. Dates arrive as ISO strings over JSON.
 export interface Task {
@@ -40,11 +41,14 @@ export interface TaskListParams {
   page: number;
   sortBy: SortField;
   order?: 'asc' | 'desc';
+  // Feature 11. Part of the params object, so a filtered page is cached
+  // separately from the same page unfiltered.
+  filters?: TaskFilters;
 }
 
 // Keys are arrays and invalidation depends on their consistency (CLAUDE.md). The
-// list key carries the params object so each page/sort combination is cached
-// distinctly; every mutation invalidates the whole `['tasks']` subtree.
+// list key carries the params object so each page/sort/filter combination is
+// cached distinctly; every mutation invalidates the whole `['tasks']` subtree.
 export const taskKeys = {
   all: ['tasks'] as const,
   list: (clientId: string, params: TaskListParams) =>
@@ -60,7 +64,8 @@ export function useTasks(
   const search = new URLSearchParams({
     page: String(params.page),
     sortBy: params.sortBy,
-    ...(params.order ? { order: params.order } : {})
+    ...(params.order ? { order: params.order } : {}),
+    ...filtersToSearchParams(params.filters ?? {})
   });
   return useQuery({
     queryKey: taskKeys.list(clientId, params),

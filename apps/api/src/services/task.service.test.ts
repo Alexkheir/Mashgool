@@ -136,10 +136,34 @@ describe('listTasks', () => {
     });
 
     expect(mockTaskFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { clientId: CLIENT }, skip: 20, take: 20 })
+      expect.objectContaining({ where: { AND: [{ clientId: CLIENT }] }, skip: 20, take: 20 })
     );
     expect(result).toMatchObject({ page: 2, pageSize: 20, total: 23, totalPages: 2 });
     expect(result.tasks).toHaveLength(1);
+  });
+
+  it('applies filters to the list as well as the board', async () => {
+    mockClientFindFirst.mockResolvedValue({ id: CLIENT });
+    mockTaskCount.mockResolvedValue(1);
+    mockTaskFindMany.mockResolvedValue([fakeTask()]);
+
+    await taskService.listTasks(USER, CLIENT, {
+      page: 1,
+      sortBy: 'createdAt',
+      priority: ['URGENT', 'HIGH']
+    });
+
+    expect(mockTaskFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [{ clientId: CLIENT }, { AND: [{ priority: { in: ['URGENT', 'HIGH'] } }] }]
+        }
+      })
+    );
+    // The count must see the same filter, or pagination lies about the total.
+    expect(mockTaskCount).toHaveBeenCalledWith({
+      where: { AND: [{ clientId: CLIENT }, { AND: [{ priority: { in: ['URGENT', 'HIGH'] } }] }] }
+    });
   });
 
   it('sorts due dates ascending with nulls last by default', async () => {
@@ -246,12 +270,60 @@ describe('changeTaskStatus', () => {
   });
 });
 
+describe('buildFilterWhere', () => {
+  it('returns undefined when nothing is filtered', () => {
+    expect(taskService.buildFilterWhere({})).toBeUndefined();
+  });
+
+  it('ANDs every active filter together', () => {
+    const where = taskService.buildFilterWhere({
+      status: ['TODO', 'BLOCKED'],
+      priority: ['URGENT'],
+      client: 'brand'
+    });
+
+    expect(where).toEqual({
+      AND: [
+        { status: { in: ['TODO', 'BLOCKED'] } },
+        { priority: { in: ['URGENT'] } },
+        { client: { name: { contains: 'brand', mode: 'insensitive' } } }
+      ]
+    });
+  });
+
+  it('matches a task key exactly, not as a search', () => {
+    expect(taskService.buildFilterWhere({ taskKey: 'BS-12' })).toEqual({
+      AND: [{ taskKey: 'BS-12' }]
+    });
+  });
+
+  it('scopes due=today to a single UTC day', () => {
+    const where = taskService.buildFilterWhere({ due: 'today' });
+    const range = (where!.AND as Array<{ dueDate: { gte: Date; lt: Date } }>)[0]!.dueDate;
+
+    expect(range.gte.toISOString()).toBe(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+    expect(range.lt.getTime() - range.gte.getTime()).toBe(86_400_000);
+  });
+
+  it('scopes due=this-week to the Monday–Sunday week containing today', () => {
+    const where = taskService.buildFilterWhere({ due: 'this-week' });
+    const range = (where!.AND as Array<{ dueDate: { gte: Date; lt: Date } }>)[0]!.dueDate;
+
+    expect(range.lt.getTime() - range.gte.getTime()).toBe(7 * 86_400_000);
+    expect(range.gte.getUTCDay()).toBe(1); // starts on a Monday
+    // Today falls inside the window — including earlier days of this week, which
+    // is deliberate (they're still this week's work).
+    expect(range.gte.getTime()).toBeLessThanOrEqual(Date.now());
+    expect(range.lt.getTime()).toBeGreaterThan(Date.now());
+  });
+});
+
 describe('getClientBoard / getGlobalBoard', () => {
   it('returns all four columns, empty ones included', async () => {
     mockClientFindFirst.mockResolvedValue({ id: CLIENT });
     mockTaskFindMany.mockResolvedValue([]);
 
-    const columns = await taskService.getClientBoard(USER, CLIENT);
+    const columns = await taskService.getClientBoard(USER, CLIENT, {});
 
     expect(Object.keys(columns).sort()).toEqual(
       ['BLOCKED', 'DONE', 'IN_PROGRESS', 'TODO'].sort()
@@ -272,14 +344,14 @@ describe('getClientBoard / getGlobalBoard', () => {
     const client = { id: CLIENT, name: 'Brand Studio', shortCode: 'BS', color: '#4A90D9' };
     mockTaskFindMany.mockResolvedValue([{ ...fakeTask(), client }]);
 
-    const columns = await taskService.getClientBoard(USER, CLIENT);
+    const columns = await taskService.getClientBoard(USER, CLIENT, {});
 
     expect(columns.TODO[0]).toMatchObject({ taskKey: 'BS-1', client });
   });
 
   it('returns 404 for a client the user does not own', async () => {
     mockClientFindFirst.mockResolvedValue(null);
-    await expect(taskService.getClientBoard(USER, 'other')).rejects.toMatchObject({
+    await expect(taskService.getClientBoard(USER, 'other', {})).rejects.toMatchObject({
       statusCode: 404
     });
     expect(mockTaskFindMany).not.toHaveBeenCalled();
@@ -288,11 +360,32 @@ describe('getClientBoard / getGlobalBoard', () => {
   it('scopes the global board to the user and skips archived workspaces', async () => {
     mockTaskFindMany.mockResolvedValue([]);
 
-    await taskService.getGlobalBoard(USER);
+    await taskService.getGlobalBoard(USER, {});
 
     expect(mockTaskFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ client: { userId: USER, isArchived: false } })
+        where: { AND: [{ client: { userId: USER, isArchived: false } }, { status: 'TODO' }] }
+      })
+    );
+  });
+
+  it('ANDs a status filter with each column, leaving excluded columns empty', async () => {
+    mockClientFindFirst.mockResolvedValue({ id: CLIENT });
+    mockTaskFindMany.mockResolvedValue([]);
+
+    await taskService.getClientBoard(USER, CLIENT, { status: ['BLOCKED'] });
+
+    // The DONE column still runs, with both conditions — so it returns nothing
+    // rather than being dropped from the board.
+    expect(mockTaskFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            { clientId: CLIENT },
+            { status: 'DONE' },
+            { AND: [{ status: { in: ['BLOCKED'] } }] }
+          ]
+        }
       })
     );
   });

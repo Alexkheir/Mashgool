@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import * as taskService from '../services/task.service';
-import type { ListTasksQuery } from '../dtos/task.dto';
+import type { ListTasksQuery, TaskFilters } from '../dtos/task.dto';
 
 // Controllers stay thin: pull the authenticated user + params off the request,
 // call a service, shape the HTTP response. `req.user` is guaranteed by
@@ -28,13 +28,17 @@ export async function createTask(req: Request, res: Response) {
 export async function getClientBoard(req: Request, res: Response) {
   const columns = await taskService.getClientBoard(
     req.user!.id,
-    req.params.clientId as string
+    req.params.clientId as string,
+    res.locals.query as TaskFilters
   );
   res.status(200).json({ columns });
 }
 
 export async function getGlobalBoard(req: Request, res: Response) {
-  const columns = await taskService.getGlobalBoard(req.user!.id);
+  const columns = await taskService.getGlobalBoard(
+    req.user!.id,
+    res.locals.query as TaskFilters
+  );
   res.status(200).json({ columns });
 }
 
