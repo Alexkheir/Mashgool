@@ -28,6 +28,21 @@ export const PRIORITY_META: Record<TaskPriority, { label: string; badge: string 
   URGENT: { label: 'Urgent', badge: 'bg-red-100 text-red-700' }
 };
 
+// The board's four columns, in the order the spec fixes them (Feature 10):
+// To Do · In Progress · Blocked · Done. Deliberately *not* the same order as
+// TASK_STATUSES — that list mirrors the database enum, whose order drives
+// priority-style sorting on the server and must not be reshuffled for display.
+export const BOARD_COLUMNS = ['TODO', 'IN_PROGRESS', 'BLOCKED', 'DONE'] as const;
+
+// Per-column accent used for the header dot and count chip. Derived from the
+// same palette as STATUS_META so a card's badge and its column agree.
+export const COLUMN_META: Record<TaskStatus, { dot: string; count: string }> = {
+  TODO: { dot: 'bg-neutral-400', count: 'bg-neutral-100 text-neutral-600' },
+  IN_PROGRESS: { dot: 'bg-blue-500', count: 'bg-blue-100 text-blue-700' },
+  BLOCKED: { dot: 'bg-red-500', count: 'bg-red-100 text-red-700' },
+  DONE: { dot: 'bg-green-500', count: 'bg-green-100 text-green-700' }
+};
+
 // Sort options offered in the list toolbar (Feature 9 "Sort Tasks").
 export const SORT_OPTIONS = [
   { value: 'createdAt', label: 'Newest' },

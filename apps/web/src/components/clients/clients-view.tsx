@@ -10,11 +10,16 @@ import {
   useUnarchiveClient,
   type Client
 } from '@/lib/use-clients';
-import { useUiStore } from '@/lib/ui-store';
+import { cn } from '@/lib/utils';
+import { GLOBAL_SCOPE, useUiStore, useViewMode } from '@/lib/ui-store';
+import { useDeleteTask, type Task } from '@/lib/use-tasks';
 import { ClientForm } from './client-form';
 import { ClientCard } from './client-card';
+import { GlobalBoard } from '@/components/board/global-board';
+import { TaskForm } from '@/components/tasks/task-form';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
+import { ViewToggle } from '@/components/ui/view-toggle';
 import { PlusIcon } from '@/components/ui/icons';
 
 export function ClientsView() {
@@ -22,6 +27,11 @@ export function ClientsView() {
   const { data: clients, isLoading, isError } = useClients();
   const activeClientId = useUiStore((s) => s.activeClientId);
   const setActiveClient = useUiStore((s) => s.setActiveClient);
+
+  // The dashboard shows either the workspace grid or one board spanning every
+  // workspace (Feature 10 "Global Board View"). The dashboard isn't a client, so
+  // its choice is stored under the reserved global scope.
+  const viewMode = useViewMode(GLOBAL_SCOPE);
 
   // Selecting a client opens its workspace; we also record it as active so the
   // choice persists (ui.store) for future navigation.
@@ -39,6 +49,12 @@ export function ClientsView() {
   const [deleting, setDeleting] = useState<Client | null>(null);
   const [showArchived, setShowArchived] = useState(false);
 
+  // Tasks opened from the global board — the dashboard edits and deletes them in
+  // place rather than sending the user into the workspace first.
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [deletingTask, setDeletingTask] = useState<Task | null>(null);
+  const deleteTask = useDeleteTask();
+
   const archivedQuery = useArchivedClients(showArchived);
 
   function confirmDelete() {
@@ -52,10 +68,22 @@ export function ClientsView() {
     });
   }
 
+  function confirmDeleteTask() {
+    if (!deletingTask) return;
+    deleteTask.mutate(deletingTask.id, { onSuccess: () => setDeletingTask(null) });
+  }
+
   const totalOpen = clients?.reduce((sum, c) => sum + c.openTaskCount, 0) ?? 0;
+  const boardView = viewMode === 'board';
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-5 py-8 sm:px-8 sm:py-10">
+    <section
+      className={cn(
+        'mx-auto w-full px-5 py-8 sm:px-8 sm:py-10',
+        // The board needs the wider column its four cards live in.
+        boardView ? 'max-w-7xl' : 'max-w-6xl'
+      )}
+    >
       <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Dashboard</h1>
@@ -65,18 +93,23 @@ export function ClientsView() {
               : 'Each client is a workspace with its own task keys.'}
           </p>
         </div>
-        <Button onClick={() => setCreating(true)}>
-          <PlusIcon className="h-4 w-4" />
-          New client
-        </Button>
+        <div className="flex items-center gap-3">
+          <ViewToggle scope={GLOBAL_SCOPE} />
+          <Button onClick={() => setCreating(true)}>
+            <PlusIcon className="h-4 w-4" />
+            New client
+          </Button>
+        </div>
       </header>
 
-      {isLoading && <p className="text-sm text-neutral-500">Loading clients…</p>}
-      {isError && (
+      {boardView && <GlobalBoard onOpenTask={setEditingTask} />}
+
+      {!boardView && isLoading && <p className="text-sm text-neutral-500">Loading clients…</p>}
+      {!boardView && isError && (
         <p className="text-sm text-red-600">Couldn’t load your clients. Please refresh.</p>
       )}
 
-      {clients && clients.length === 0 && (
+      {!boardView && clients && clients.length === 0 && (
         <div className="animate-[rise-in] rounded-2xl border border-dashed border-neutral-300 bg-white/50 p-12 text-center">
           <p className="text-sm text-neutral-600">You don’t have any clients yet.</p>
           <p className="mx-auto mt-1 max-w-xs text-sm text-neutral-400">
@@ -90,7 +123,7 @@ export function ClientsView() {
         </div>
       )}
 
-      {clients && clients.length > 0 && (
+      {!boardView && clients && clients.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {clients.map((client) => (
             <ClientCard
@@ -106,8 +139,9 @@ export function ClientsView() {
         </div>
       )}
 
-      {/* Archived clients are hidden by default (Feature 8 spec). */}
-      <div className="mt-10">
+      {/* Archived clients are hidden by default (Feature 8 spec). Archived
+          workspaces are absent from the board, so the section goes with the grid. */}
+      <div className={cn('mt-10', boardView && 'hidden')}>
         <button
           type="button"
           onClick={() => setShowArchived((v) => !v)}
@@ -164,6 +198,44 @@ export function ClientsView() {
           </Button>
           <Button variant="danger" onClick={confirmDelete} disabled={deleteClient.isPending}>
             {deleteClient.isPending ? 'Deleting…' : 'Delete client'}
+          </Button>
+        </div>
+      </Modal>
+
+      {/* A card opened from the global board. Its client comes from the task
+          itself, since the board spans every workspace. */}
+      {editingTask && (
+        <TaskForm
+          key={editingTask.id}
+          open
+          clientId={editingTask.clientId}
+          task={editingTask}
+          onDelete={() => {
+            setDeletingTask(editingTask);
+            setEditingTask(null);
+          }}
+          onClose={() => setEditingTask(null)}
+        />
+      )}
+
+      <Modal
+        open={Boolean(deletingTask)}
+        onClose={() => setDeletingTask(null)}
+        title="Delete task?"
+      >
+        <p className="text-sm text-neutral-600">
+          Deleting{' '}
+          <span className="font-medium text-neutral-900">
+            {deletingTask?.taskKey} — {deletingTask?.title}
+          </span>{' '}
+          is permanent, and its key is retired for good. This can’t be undone.
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setDeletingTask(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteTask} disabled={deleteTask.isPending}>
+            {deleteTask.isPending ? 'Deleting…' : 'Delete task'}
           </Button>
         </div>
       </Modal>

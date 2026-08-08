@@ -54,11 +54,24 @@ export const UpdateTaskDto = z
     message: 'Provide at least one field to update'
   });
 
-// The one-click status change (mark Done, or a board drop). Kept separate from
-// the general PATCH so it maps to its own audit action (TASK_STATUS_CHANGED).
+// The one-click status change (mark Done). Kept separate from the general PATCH
+// so it maps to its own audit action (TASK_STATUS_CHANGED).
 export const ChangeStatusDto = z
   .object({
     status: z.enum(TASK_STATUSES)
+  })
+  .strict();
+
+// A board drag-and-drop (Feature 10). One drop expresses *both* facts at once —
+// which column the card landed in and where in that column — so they travel in a
+// single request and are applied in one transaction. `position` is the 0-based
+// index the card should occupy in the destination column *after* the move; the
+// service clamps it to the column's length, so an out-of-range index appends
+// rather than failing (a drop is a gesture, not a precise coordinate).
+export const MoveTaskDto = z
+  .object({
+    status: z.enum(TASK_STATUSES),
+    position: z.number().int().min(0)
   })
   .strict();
 
@@ -75,4 +88,5 @@ export const ListTasksQueryDto = z.object({
 export type CreateTaskInput = z.infer<typeof CreateTaskDto>;
 export type UpdateTaskInput = z.infer<typeof UpdateTaskDto>;
 export type ChangeStatusInput = z.infer<typeof ChangeStatusDto>;
+export type MoveTaskInput = z.infer<typeof MoveTaskDto>;
 export type ListTasksQuery = z.infer<typeof ListTasksQueryDto>;

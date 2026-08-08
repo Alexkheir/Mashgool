@@ -30,12 +30,23 @@ interface TaskFormProps {
   // Pre-selected status for a brand-new task (e.g. created from a board column,
   // Feature 10). Ignored in edit mode.
   initialStatus?: TaskStatus;
+  // When editing, offers delete from inside the form. The board has no per-card
+  // action buttons (a card is a drag handle), so this is how a task opened from
+  // a board gets deleted. The parent still owns the confirmation dialog.
+  onDelete?: () => void;
 }
 
 const inputClass =
   'w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 outline-none transition placeholder:text-neutral-400 focus:border-brand-400 focus:ring-2 focus:ring-brand-500/20';
 
-export function TaskForm({ open, onClose, clientId, task, initialStatus }: TaskFormProps) {
+export function TaskForm({
+  open,
+  onClose,
+  clientId,
+  task,
+  initialStatus,
+  onDelete
+}: TaskFormProps) {
   const isEdit = Boolean(task);
   const createTask = useCreateTask(clientId);
   const updateTask = useUpdateTask();
@@ -205,7 +216,16 @@ export function TaskForm({ open, onClose, clientId, task, initialStatus }: TaskF
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex items-center justify-end gap-2 pt-2">
+          {isEdit && onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="mr-auto rounded px-2 py-1 text-sm font-medium text-red-600 transition hover:bg-red-50"
+            >
+              Delete
+            </button>
+          )}
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
