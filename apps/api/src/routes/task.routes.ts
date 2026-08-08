@@ -7,7 +7,8 @@ import {
   UpdateTaskDto,
   ChangeStatusDto,
   MoveTaskDto,
-  ListTasksQueryDto
+  ListTasksQueryDto,
+  BoardQueryDto
 } from '../dtos/task.dto';
 
 // Tasks are addressed two ways. Operations that need a client context (list a
@@ -23,13 +24,13 @@ clientTaskRouter.post('/', validate(CreateTaskDto), taskController.createTask);
 // The same tasks grouped into board columns. Unpaginated and unsorted by query —
 // the board has its own fixed shape — so it gets its own path rather than a mode
 // flag on the list endpoint.
-clientTaskRouter.get('/board', taskController.getClientBoard);
+clientTaskRouter.get('/board', validateQuery(BoardQueryDto), taskController.getClientBoard);
 
 // Flat: mounted at `/tasks` — operations on a task by id.
 export const taskRouter = Router();
 taskRouter.use(requireAuth);
 // Declared before `/:taskId`, which would otherwise match "board" as an id.
-taskRouter.get('/board', taskController.getGlobalBoard);
+taskRouter.get('/board', validateQuery(BoardQueryDto), taskController.getGlobalBoard);
 taskRouter.get('/:taskId', taskController.getTask);
 taskRouter.patch('/:taskId', validate(UpdateTaskDto), taskController.updateTask);
 taskRouter.patch('/:taskId/status', validate(ChangeStatusDto), taskController.changeTaskStatus);

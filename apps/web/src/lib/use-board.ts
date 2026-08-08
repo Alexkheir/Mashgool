@@ -9,6 +9,7 @@ import {
 import { request, clientKeys } from './use-clients';
 import { taskKeys, type Task } from './use-tasks';
 import type { TaskStatus } from '@/dtos/task.dto';
+import { filtersToSearchParams, type TaskFilters } from './filter-parser';
 
 // A board card is a task plus the workspace it belongs to. The global board needs
 // that (four columns hold cards from every client), and the per-client board gets
@@ -24,36 +25,57 @@ export type BoardColumns = Record<TaskStatus, BoardTask[]>;
 // Board data is its own cache subtree, not a slice of `['tasks']`: it is grouped,
 // unpaginated, and unsorted by the list's sort field, so the two views can't share
 // an entry. Mutations invalidate both.
+//
+// The active filters are part of the key (Feature 11) — a filtered board is a
+// different result set, and caching it under the same key as the unfiltered one
+// would show stale cards for a moment on every filter change.
 export const boardKeys = {
   all: ['board'] as const,
-  global: ['board', 'global'] as const,
+  global: (filters: TaskFilters = {}) => ['board', 'global', filters] as const,
   // Client ids are UUIDs, so this can never collide with the 'global' key.
-  client: (clientId: string) => ['board', clientId] as const
+  client: (clientId: string, filters: TaskFilters = {}) =>
+    ['board', clientId, filters] as const
 };
 
-export type BoardQueryKey = typeof boardKeys.global | ReturnType<typeof boardKeys.client>;
+export type BoardQueryKey =
+  | ReturnType<typeof boardKeys.global>
+  | ReturnType<typeof boardKeys.client>;
 
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
-export function useClientBoard(clientId: string, enabled: boolean): UseQueryResult<BoardColumns> {
+function boardSearch(filters: TaskFilters): string {
+  const search = new URLSearchParams(filtersToSearchParams(filters)).toString();
+  return search ? `?${search}` : '';
+}
+
+export function useClientBoard(
+  clientId: string,
+  filters: TaskFilters,
+  enabled: boolean
+): UseQueryResult<BoardColumns> {
   return useQuery({
-    queryKey: boardKeys.client(clientId),
+    queryKey: boardKeys.client(clientId, filters),
     enabled, // only fetch while the board view is actually showing
     queryFn: async () => {
       const data = await request<{ columns: BoardColumns }>(
-        `/api/v1/clients/${clientId}/tasks/board`
+        `/api/v1/clients/${clientId}/tasks/board${boardSearch(filters)}`
       );
       return data.columns;
     }
   });
 }
 
-export function useGlobalBoard(enabled: boolean): UseQueryResult<BoardColumns> {
+export function useGlobalBoard(
+  filters: TaskFilters,
+  enabled: boolean
+): UseQueryResult<BoardColumns> {
   return useQuery({
-    queryKey: boardKeys.global,
+    queryKey: boardKeys.global(filters),
     enabled,
     queryFn: async () => {
-      const data = await request<{ columns: BoardColumns }>('/api/v1/tasks/board');
+      const data = await request<{ columns: BoardColumns }>(
+        `/api/v1/tasks/board${boardSearch(filters)}`
+      );
       return data.columns;
     }
   });

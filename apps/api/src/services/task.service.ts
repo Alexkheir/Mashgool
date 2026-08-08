@@ -8,7 +8,8 @@ import {
   type CreateTaskInput,
   type UpdateTaskInput,
   type ListTasksQuery,
-  type MoveTaskInput
+  type MoveTaskInput,
+  type TaskFilters
 } from '../dtos/task.dto';
 
 // A fixed page size for task lists (see Feature 9 "Pagination"). Kept server-side
@@ -116,6 +117,51 @@ async function findOwnedTaskOrThrow(userId: string, taskId: string): Promise<Tas
   return task;
 }
 
+// ─── Filters (Feature 11) ────────────────────────────────────────────────────
+
+// Midnight UTC on the day `offsetDays` from today. Due dates are day-granular
+// and UTC-anchored everywhere in this app (see the DTO's isNotPast), so the
+// windows below are built the same way.
+function utcDayStart(offsetDays = 0): Date {
+  const now = new Date();
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offsetDays)
+  );
+}
+
+// `due = today` is the single calendar day. `due = this week` is the *calendar*
+// week containing today, Monday through Sunday — not "the next seven days".
+// Deliberate: a task that was due on Monday is still part of this week's work on
+// Thursday, and dropping it would hide exactly the tasks the user is chasing.
+function dueRange(due: NonNullable<TaskFilters['due']>): { gte: Date; lt: Date } {
+  if (due === 'today') {
+    return { gte: utcDayStart(), lt: utcDayStart(1) };
+  }
+  // getUTCDay is 0=Sunday; shift so Monday is 0.
+  const daysSinceMonday = (new Date().getUTCDay() + 6) % 7;
+  return { gte: utcDayStart(-daysSinceMonday), lt: utcDayStart(7 - daysSinceMonday) };
+}
+
+// Turns parsed filters into a Prisma `where`, or undefined when nothing is set.
+// Returned as a *separate* clause rather than merged into the caller's `where`:
+// every caller composes with `AND`, so a status filter can sit alongside the
+// board's per-column status without one silently overwriting the other.
+export function buildFilterWhere(filters: TaskFilters): Prisma.TaskWhereInput | undefined {
+  const clauses: Prisma.TaskWhereInput[] = [];
+
+  // A key lookup is an exact match — it surfaces one task, not a search result.
+  if (filters.taskKey) clauses.push({ taskKey: filters.taskKey });
+  if (filters.status?.length) clauses.push({ status: { in: filters.status } });
+  if (filters.priority?.length) clauses.push({ priority: { in: filters.priority } });
+  if (filters.client) {
+    clauses.push({ client: { name: { contains: filters.client, mode: 'insensitive' } } });
+  }
+  if (filters.due) clauses.push({ dueDate: dueRange(filters.due) });
+
+  if (clauses.length === 0) return undefined;
+  return { AND: clauses };
+}
+
 // Absent an explicit direction, each sort field has a sensible default:
 // soonest-due first, highest-priority first, newest-created first.
 function defaultOrder(sortBy: ListTasksQuery['sortBy']): 'asc' | 'desc' {
@@ -147,7 +193,12 @@ export async function listTasks(
 
   const { page, sortBy } = query;
   const order = query.order ?? defaultOrder(sortBy);
-  const where: Prisma.TaskWhereInput = { clientId };
+  const filterWhere = buildFilterWhere(query);
+  // Composed with AND rather than spread, so a filter clause can never collide
+  // with the ownership scope it is being added to.
+  const where: Prisma.TaskWhereInput = {
+    AND: [{ clientId }, ...(filterWhere ? [filterWhere] : [])]
+  };
 
   const [total, tasks] = await Promise.all([
     prisma.task.count({ where }),
@@ -182,11 +233,20 @@ const BOARD_ORDER: Prisma.TaskOrderByWithRelationInput[] = [
 // BOARD_COLUMN_LIMIT per column (so a huge backlog can't crowd out Done) and
 // each query rides the `(client_id, status)` index the schema declares for
 // exactly this view.
-async function fetchColumns(where: Prisma.TaskWhereInput): Promise<BoardColumns> {
+async function fetchColumns(
+  scope: Prisma.TaskWhereInput,
+  filters: TaskFilters
+): Promise<BoardColumns> {
+  const filterWhere = buildFilterWhere(filters);
+
   const columns = await Promise.all(
     TASK_STATUSES.map((status) =>
       prisma.task.findMany({
-        where: { ...where, status },
+        // AND, not a spread: a `status` *filter* and the column's own status are
+        // two different conditions on the same field. Both must hold, which is
+        // what keeps a filtered board spread across the correct columns — the
+        // columns the filter excludes simply come back empty.
+        where: { AND: [scope, { status }, ...(filterWhere ? [filterWhere] : [])] },
         orderBy: BOARD_ORDER,
         take: BOARD_COLUMN_LIMIT,
         include: { client: boardClientSelect }
@@ -202,17 +262,21 @@ async function fetchColumns(where: Prisma.TaskWhereInput): Promise<BoardColumns>
 // The per-client board: every task in one workspace, grouped into four columns.
 export async function getClientBoard(
   userId: string,
-  clientId: string
+  clientId: string,
+  filters: TaskFilters
 ): Promise<BoardColumns> {
   await assertClientOwned(userId, clientId);
-  return fetchColumns({ clientId });
+  return fetchColumns({ clientId }, filters);
 }
 
 // The global board: the same four columns across every *active* workspace.
 // Archived clients are excluded — an archived workspace is out of sight on the
 // dashboard, so its tasks shouldn't reappear on the board next to live work.
-export async function getGlobalBoard(userId: string): Promise<BoardColumns> {
-  return fetchColumns({ client: { userId, isArchived: false } });
+export async function getGlobalBoard(
+  userId: string,
+  filters: TaskFilters
+): Promise<BoardColumns> {
+  return fetchColumns({ client: { userId, isArchived: false } }, filters);
 }
 
 // A drag-and-drop drop: move a task into `status` at `position` within that
