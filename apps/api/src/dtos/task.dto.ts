@@ -5,6 +5,7 @@ import { z } from 'zod';
 // display labels / colors (DTOs are duplicated per app — see CLAUDE.md).
 export const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE', 'BLOCKED'] as const;
 export const TASK_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+export const CREATION_METHODS = ['MANUAL', 'PASTE_TO_TASK', 'VOICE_TO_TASK'] as const;
 
 // True when an ISO datetime's calendar day is today (UTC) or later. Due dates are
 // day-granular and UTC-anchored throughout the app, so we compare date parts.
@@ -33,7 +34,17 @@ export const CreateTaskDto = z
     // Board columns pre-set the status of tasks created from them (Feature 10),
     // so a create may carry an initial status; it defaults to TODO otherwise.
     status: z.enum(TASK_STATUSES).optional(),
-    dueDate: dueDate.nullable().optional()
+    dueDate: dueDate.nullable().optional(),
+    // How this task came to exist — manual form, paste-to-task, voice-to-task.
+    // Client-supplied, unlike every other server-owned field, because the review
+    // step of the AI flows saves through this same endpoint: the user edits the
+    // extraction and then creates an ordinary task from it, so nothing on the
+    // server still knows the text was extracted rather than typed.
+    //
+    // Safe to accept because it is *provenance, not authority*: it grants no
+    // access, gates no behaviour, and is only ever read as a label on the task
+    // and in the audit trail. A client that lies mislabels its own task.
+    creationMethod: z.enum(CREATION_METHODS).optional()
   })
   .strict();
 

@@ -3,6 +3,7 @@ import { healthRouter } from './health.routes';
 import { authRouter } from './auth.routes';
 import { clientRouter } from './client.routes';
 import { taskRouter, clientTaskRouter } from './task.routes';
+import { aiRouter } from './ai.routes';
 
 export const router = Router();
 
@@ -14,3 +15,4 @@ router.use('/clients', clientRouter);
 // order here is not sensitive.
 router.use('/clients/:clientId/tasks', clientTaskRouter);
 router.use('/tasks', taskRouter);
+router.use('/ai', aiRouter);

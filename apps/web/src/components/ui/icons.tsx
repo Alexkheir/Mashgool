@@ -93,6 +93,18 @@ export function CheckIcon(props: IconProps) {
   );
 }
 
+// A four-point sparkle — the AI-assisted actions (paste to task, and voice to
+// task in Feature 14). Two stars, one large and one small, so the mark reads as
+// "generated" rather than as a plain star rating.
+export function SparkIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M10 3.5 11.7 8.3 16.5 10 11.7 11.7 10 16.5 8.3 11.7 3.5 10 8.3 8.3Z" />
+      <path d="M17.5 14.5 18.4 16.6 20.5 17.5 18.4 18.4 17.5 20.5 16.6 18.4 14.5 17.5 16.6 16.6Z" />
+    </Base>
+  );
+}
+
 // The brand mark: a rounded emerald tile with an "M" cluster of dots.
 export function LogoMark({ className }: { className?: string }) {
   return (

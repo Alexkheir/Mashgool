@@ -12,6 +12,7 @@ interface BoardColumnProps {
   status: TaskStatus;
   tasks: BoardTask[];
   showClient?: boolean;
+  highlightId?: string | null;
   onOpenTask: (task: BoardTask) => void;
   // Absent on the global board, which has no single workspace to create in.
   onAddTask?: () => void;
@@ -21,6 +22,7 @@ export function BoardColumn({
   status,
   tasks,
   showClient,
+  highlightId,
   onOpenTask,
   onAddTask
 }: BoardColumnProps) {
@@ -69,6 +71,7 @@ export function BoardColumn({
               key={task.id}
               task={task}
               showClient={showClient}
+              highlighted={task.id === highlightId}
               onOpen={() => onOpenTask(task)}
             />
           ))}

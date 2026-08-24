@@ -15,6 +15,8 @@ interface TaskRowProps {
   onToggleDone: () => void;
   onDelete: () => void;
   busy?: boolean;
+  // Briefly flagged after paste-to-task lands the user here (Feature 13).
+  highlighted?: boolean;
 }
 
 // A small text action, matching the client card's footer buttons.
@@ -47,7 +49,14 @@ function RowAction({
   );
 }
 
-export function TaskRow({ task, onEdit, onToggleDone, onDelete, busy }: TaskRowProps) {
+export function TaskRow({
+  task,
+  onEdit,
+  onToggleDone,
+  onDelete,
+  busy,
+  highlighted
+}: TaskRowProps) {
   const overdue = isOverdue(task.dueDate);
   const done = task.status === 'DONE';
 
@@ -62,7 +71,10 @@ export function TaskRow({ task, onEdit, onToggleDone, onDelete, busy }: TaskRowP
           onEdit();
         }
       }}
-      className="flex items-center gap-4 rounded-xl border border-neutral-200/80 bg-surface px-4 py-3 text-left shadow-[var(--shadow-card)] transition duration-200 hover:-translate-y-px hover:border-neutral-300 hover:shadow-[var(--shadow-card-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50"
+      className={cn(
+        'flex items-center gap-4 rounded-xl border border-neutral-200/80 bg-surface px-4 py-3 text-left shadow-[var(--shadow-card)] transition duration-200 hover:-translate-y-px hover:border-neutral-300 hover:shadow-[var(--shadow-card-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/50',
+        highlighted && 'border-brand-300 ring-2 ring-brand-500/40'
+      )}
     >
       <span className="shrink-0 rounded-md bg-neutral-100 px-2 py-0.5 font-mono text-xs font-medium text-neutral-500">
         {task.taskKey}

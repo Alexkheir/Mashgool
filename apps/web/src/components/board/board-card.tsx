@@ -12,6 +12,8 @@ interface BoardCardProps {
   // The global board mixes workspaces, so each card names its client. The
   // per-client board doesn't — every card there belongs to the same one.
   showClient?: boolean;
+  // Briefly flagged after paste-to-task lands the user here (Feature 13).
+  highlighted?: boolean;
   onOpen?: () => void;
 }
 
@@ -27,6 +29,7 @@ type BoardCardBodyProps = Omit<BoardCardProps, 'onOpen'> &
 export function BoardCardBody({
   task,
   showClient,
+  highlighted,
   dragging,
   overlay,
   className,
@@ -45,6 +48,7 @@ export function BoardCardBody({
         // "real" card is the one in the DragOverlay following the cursor.
         dragging && 'opacity-40',
         overlay ? 'rotate-2 cursor-grabbing shadow-[var(--shadow-card-hover)]' : 'cursor-grab',
+        highlighted && 'border-brand-300 ring-2 ring-brand-500/40',
         className
       )}
     >
@@ -105,7 +109,7 @@ export function BoardCardBody({
 // A card in its column: draggable, sortable, and still clickable. The sensor's
 // activation distance (see ScrumBoard) is what lets one element be both — a press
 // that doesn't travel is a click, one that does starts a drag.
-export function SortableBoardCard({ task, showClient, onOpen }: BoardCardProps) {
+export function SortableBoardCard({ task, showClient, highlighted, onOpen }: BoardCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id
   });
@@ -124,6 +128,7 @@ export function SortableBoardCard({ task, showClient, onOpen }: BoardCardProps) 
     <BoardCardBody
       task={task}
       showClient={showClient}
+      highlighted={highlighted}
       dragging={isDragging}
       {...attributes}
       {...listeners}

@@ -377,9 +377,11 @@ export async function createTask(
         description: input.description ?? null,
         notes: input.notes ?? null,
         boardOrder: (_max.boardOrder ?? -1) + 1,
-        // Omit optionals when absent so the schema defaults (MEDIUM / TODO) apply.
+        // Omit optionals when absent so the schema defaults (MEDIUM / TODO /
+        // MANUAL) apply.
         ...(input.priority ? { priority: input.priority } : {}),
         ...(input.status ? { status: input.status } : {}),
+        ...(input.creationMethod ? { creationMethod: input.creationMethod } : {}),
         dueDate: input.dueDate ? new Date(input.dueDate) : null
       }
     });
@@ -395,7 +397,10 @@ export async function createTask(
       taskKey: task.taskKey,
       clientId,
       status: task.status,
-      priority: task.priority
+      priority: task.priority,
+      // Feature 17's audit UI reads this to distinguish typed tasks from
+      // AI-extracted ones without joining back to the task row.
+      creationMethod: task.creationMethod
     }
   });
 

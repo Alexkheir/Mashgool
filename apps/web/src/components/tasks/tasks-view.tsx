@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useClient } from '@/lib/use-clients';
+import { useClient, useClients } from '@/lib/use-clients';
 import { useDeleteTask, type Task } from '@/lib/use-tasks';
 import { useViewMode } from '@/lib/ui-store';
 import { useFilterQuery } from '@/lib/filter-store';
+import { useHighlightedTask } from '@/lib/use-highlight';
+import { PasteToTaskModal } from '@/components/ai/paste-to-task-modal';
 import type { TaskStatus } from '@/dtos/task.dto';
 import { TaskList } from './task-list';
 import { TaskForm } from './task-form';
@@ -15,7 +17,7 @@ import { FilterBar } from '@/components/shared/filter-bar';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { ViewToggle } from '@/components/ui/view-toggle';
-import { PlusIcon, ChevronLeftIcon } from '@/components/ui/icons';
+import { PlusIcon, ChevronLeftIcon, SparkIcon } from '@/components/ui/icons';
 
 // A client workspace. The header, the create/edit/delete modals and the view
 // toggle live here; the board and the list are interchangeable bodies beneath
@@ -23,7 +25,12 @@ import { PlusIcon, ChevronLeftIcon } from '@/components/ui/icons';
 // edited. The chosen view is remembered per workspace (ui-store, keyed by id).
 export function TasksView({ clientId }: { clientId: string }) {
   const client = useClient(clientId);
+  // Already cached by the sidebar, so this costs no extra request — it backs the
+  // paste-to-task destination dropdown, which lets the user retarget a pasted
+  // message at a different client without leaving the modal.
+  const clients = useClients();
   const viewMode = useViewMode(clientId);
+  const highlightId = useHighlightedTask();
   // Scoped to this workspace, so each client keeps its own filters, and they
   // survive a board/list toggle but not navigating away (Feature 11 spec).
   const filter = useFilterQuery(clientId);
@@ -33,6 +40,7 @@ export function TasksView({ clientId }: { clientId: string }) {
   const [creating, setCreating] = useState<{ status?: TaskStatus } | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
+  const [pasting, setPasting] = useState(false);
 
   function confirmDelete() {
     if (!deleting) return;
@@ -71,6 +79,11 @@ export function TasksView({ clientId }: { clientId: string }) {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle scope={clientId} />
+          {/* Opened from inside a workspace, so this client is pre-selected. */}
+          <Button variant="ghost" onClick={() => setPasting(true)}>
+            <SparkIcon className="h-4 w-4" />
+            Paste to task
+          </Button>
           <Button onClick={() => setCreating({})}>
             <PlusIcon className="h-4 w-4" />
             New task
@@ -92,6 +105,7 @@ export function TasksView({ clientId }: { clientId: string }) {
           clientId={clientId}
           filters={filter.filters}
           onClearFilters={filter.clear}
+          highlightId={highlightId}
           onOpenTask={setEditing}
           // The "+" on a column creates a task already in that column's status.
           onAddTask={(status) => setCreating({ status })}
@@ -102,9 +116,19 @@ export function TasksView({ clientId }: { clientId: string }) {
           clientId={clientId}
           filters={filter.filters}
           onClearFilters={filter.clear}
+          highlightId={highlightId}
           onEdit={setEditing}
           onDelete={setDeleting}
           onCreate={() => setCreating({})}
+        />
+      )}
+
+      {pasting && (
+        <PasteToTaskModal
+          open
+          clients={clients.data ?? []}
+          initialClientId={clientId}
+          onClose={() => setPasting(false)}
         />
       )}
 

@@ -148,7 +148,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           # Passed as environment variables to the remote script — avoids
           # interpolating secrets directly into shell text.
-          envs: IMAGE_TAG,GHCR_OWNER,DOMAIN,POSTGRES_PASSWORD,GHCR_PULL_TOKEN,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET
+          envs: IMAGE_TAG,GHCR_OWNER,DOMAIN,POSTGRES_PASSWORD,GHCR_PULL_TOKEN,JWT_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,CLAUDE_API_KEY
           script: |
             set -euo pipefail
             cd /opt/mashgool
@@ -165,6 +165,7 @@ jobs:
             JWT_SECRET=$JWT_SECRET
             GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID
             GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET
+            CLAUDE_API_KEY=$CLAUDE_API_KEY
             EOF
             chmod 600 .env.prod
 
@@ -190,6 +191,7 @@ jobs:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
 
       # A deploy that leaves the site down should be a red ❌, not a green ✓.
       - name: Smoke check

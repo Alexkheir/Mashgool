@@ -8,9 +8,11 @@ import { z } from 'zod';
 
 export const TASK_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE', 'BLOCKED'] as const;
 export const TASK_PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'] as const;
+export const CREATION_METHODS = ['MANUAL', 'PASTE_TO_TASK', 'VOICE_TO_TASK'] as const;
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 export type TaskPriority = (typeof TASK_PRIORITIES)[number];
+export type CreationMethod = (typeof CREATION_METHODS)[number];
 
 // Human label + badge classes per status. `badge` is a full Tailwind class set so
 // the same chip renders identically wherever a status appears.
@@ -70,7 +72,10 @@ export const CreateTaskDto = z
     notes: z.string().trim().max(5000).nullable().optional(),
     priority: z.enum(TASK_PRIORITIES).optional(),
     status: z.enum(TASK_STATUSES).optional(),
-    dueDate: dueDate.nullable().optional()
+    dueDate: dueDate.nullable().optional(),
+    // Provenance — set to PASTE_TO_TASK when the create came out of the AI
+    // review step (Feature 13). Absent means MANUAL, the server's default.
+    creationMethod: z.enum(CREATION_METHODS).optional()
   })
   .strict();
 
