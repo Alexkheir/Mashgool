@@ -7,7 +7,21 @@ import {
   type UseQueryResult
 } from '@tanstack/react-query';
 import { apiUrl } from './api-url';
+import { TASK_STATUSES, type TaskStatus } from '@/dtos/task.dto';
 import type { CreateClientInput, UpdateClientInput } from '@/dtos/client.dto';
+
+// Task counts for one client — the numbers the dashboards render (Feature 12).
+// `byStatus` always names all four statuses, so a breakdown never has a hole in
+// it. `progress` is done ÷ total as a whole percentage, computed server-side so
+// every widget showing it agrees.
+export interface TaskStats {
+  total: number;
+  open: number;
+  done: number;
+  overdue: number;
+  byStatus: Record<TaskStatus, number>;
+  progress: number;
+}
 
 // The server's public client shape. Dates arrive as ISO strings over JSON.
 export interface Client {
@@ -17,9 +31,34 @@ export interface Client {
   description: string | null;
   color: string;
   isArchived: boolean;
-  openTaskCount: number;
+  // Replaced the old `openTaskCount`, which is now `stats.open`.
+  stats: TaskStats;
   createdAt: string;
   updatedAt: string;
+}
+
+// The global dashboard's figures are the per-client ones added up — no separate
+// endpoint, and no chance of the two disagreeing.
+export function sumStats(clients: Client[]): TaskStats {
+  const total = { total: 0, open: 0, done: 0, overdue: 0 };
+  const byStatus = Object.fromEntries(TASK_STATUSES.map((s) => [s, 0])) as Record<
+    TaskStatus,
+    number
+  >;
+
+  for (const client of clients) {
+    total.total += client.stats.total;
+    total.open += client.stats.open;
+    total.done += client.stats.done;
+    total.overdue += client.stats.overdue;
+    for (const status of TASK_STATUSES) byStatus[status] += client.stats.byStatus[status];
+  }
+
+  return {
+    ...total,
+    byStatus,
+    progress: total.total === 0 ? 0 : Math.round((total.done / total.total) * 100)
+  };
 }
 
 // React Query keys are arrays, and invalidation depends on their consistency

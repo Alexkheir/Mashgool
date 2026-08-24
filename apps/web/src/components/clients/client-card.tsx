@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import type { Client } from '@/lib/use-clients';
+import { ProgressBar } from '@/components/dashboard/stats-bar';
 
 interface ClientCardProps {
   client: Client;
@@ -85,16 +86,39 @@ export function ClientCard({
         <p className="mt-3 line-clamp-2 text-sm text-neutral-500">{client.description}</p>
       )}
 
-      <div className="mt-4 flex items-center justify-between border-t border-neutral-100 pt-3">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500">
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              client.openTaskCount > 0 ? 'bg-brand-500' : 'bg-neutral-300'
-            )}
-          />
-          {client.openTaskCount} open {client.openTaskCount === 1 ? 'task' : 'tasks'}
-        </span>
+      {/* Progress (Feature 12) — pushed to the bottom by mt-auto so cards of
+          differing description length still line their footers up. */}
+      <div className="mt-auto pt-4">
+        <div className="mb-1.5 flex items-baseline justify-between text-xs">
+          <span className="font-medium text-neutral-500">
+            {client.stats.done}/{client.stats.total} done
+          </span>
+          <span className="font-semibold text-neutral-700 tabular-nums">
+            {client.stats.progress}%
+          </span>
+        </div>
+        <ProgressBar progress={client.stats.progress} />
+      </div>
+
+      <div className="mt-3 flex items-center justify-between border-t border-neutral-100 pt-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-500">
+            <span
+              className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                client.stats.open > 0 ? 'bg-brand-500' : 'bg-neutral-300'
+              )}
+            />
+            {client.stats.open} open {client.stats.open === 1 ? 'task' : 'tasks'}
+          </span>
+          {/* Only shown when there is something to worry about — a permanent
+              "0 overdue" would dilute the signal it exists to carry. */}
+          {client.stats.overdue > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+              {client.stats.overdue} overdue
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
           {onEdit && <CardAction label="Edit" onClick={onEdit} />}
           {onArchive && <CardAction label="Archive" onClick={onArchive} />}

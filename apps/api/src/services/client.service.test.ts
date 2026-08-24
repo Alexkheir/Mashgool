@@ -4,17 +4,19 @@ import { Prisma } from '@prisma/client';
 // Drive Prisma and the audit writer entirely through mocks — no DB, no side
 // effects. The real `Prisma` namespace is still imported so we can construct a
 // genuine PrismaClientKnownRequestError the service's `instanceof` check accepts.
-const { mockFindFirst, mockFindMany, mockCreate, mockUpdate, mockDelete } = vi.hoisted(
-  () => ({
+const { mockFindFirst, mockFindMany, mockCreate, mockUpdate, mockDelete, mockTaskGroupBy } =
+  vi.hoisted(() => ({
     mockFindFirst: vi.fn(),
     mockFindMany: vi.fn(),
     mockCreate: vi.fn(),
     mockUpdate: vi.fn(),
-    mockDelete: vi.fn()
-  })
-);
+    mockDelete: vi.fn(),
+    mockTaskGroupBy: vi.fn()
+  }));
 const mockWriteAuditLog = vi.hoisted(() => vi.fn());
 
+// `task.groupBy` backs the stats the read endpoints attach (Feature 12); the
+// stats service itself is exercised in stats.service.test.ts.
 vi.mock('../lib/prisma', () => ({
   prisma: {
     client: {
@@ -23,7 +25,8 @@ vi.mock('../lib/prisma', () => ({
       create: mockCreate,
       update: mockUpdate,
       delete: mockDelete
-    }
+    },
+    task: { groupBy: mockTaskGroupBy }
   }
 }));
 
@@ -43,9 +46,6 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
     color: '#4A90D9',
     isArchived: false,
     taskCounter: 0,
-    // Present so the list mapping (which reads client._count.tasks) is safe;
-    // ignored by the create/update paths that map with a default count of 0.
-    _count: { tasks: 0 },
     createdAt: new Date('2026-01-01T00:00:00Z'),
     updatedAt: new Date('2026-01-01T00:00:00Z'),
     ...overrides
@@ -62,6 +62,8 @@ function p2002(target: string[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: no tasks anywhere, so stats come back zeroed unless a test says else.
+  mockTaskGroupBy.mockResolvedValue([]);
 });
 
 describe('createClient', () => {
@@ -130,10 +132,38 @@ describe('listClients', () => {
     );
   });
 
-  it('surfaces the open-task count from the relation _count', async () => {
-    mockFindMany.mockResolvedValue([fakeClient({ _count: { tasks: 4 } })]);
+  it('attaches task stats to every client in the list', async () => {
+    mockFindMany.mockResolvedValue([fakeClient()]);
+    mockTaskGroupBy
+      // status breakdown
+      .mockResolvedValueOnce([
+        { clientId: 'c1', status: 'TODO', _count: { _all: 3 } },
+        { clientId: 'c1', status: 'DONE', _count: { _all: 1 } }
+      ])
+      // overdue
+      .mockResolvedValueOnce([{ clientId: 'c1', _count: { _all: 2 } }]);
+
     const [client] = await clientService.listClients(USER);
-    expect(client.openTaskCount).toBe(4);
+
+    expect(client!.stats).toMatchObject({
+      total: 4,
+      open: 3,
+      done: 1,
+      overdue: 2,
+      progress: 25
+    });
+    expect(client!.stats.byStatus).toEqual({
+      TODO: 3,
+      IN_PROGRESS: 0,
+      DONE: 1,
+      BLOCKED: 0
+    });
+  });
+
+  it('zeroes stats for a client with no tasks rather than omitting them', async () => {
+    mockFindMany.mockResolvedValue([fakeClient()]);
+    const [client] = await clientService.listClients(USER);
+    expect(client!.stats).toMatchObject({ total: 0, open: 0, overdue: 0, progress: 0 });
   });
 });
 

@@ -10,6 +10,7 @@ import type { TaskStatus } from '@/dtos/task.dto';
 import { TaskList } from './task-list';
 import { TaskForm } from './task-form';
 import { ClientBoard } from '@/components/board/client-board';
+import { StatsBar } from '@/components/dashboard/stats-bar';
 import { FilterBar } from '@/components/shared/filter-bar';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,11 @@ export function TasksView({ clientId }: { clientId: string }) {
           </Button>
         </div>
       </header>
+
+      {/* The per-client dashboard (Feature 12): this workspace's status
+          breakdown, overdue count and progress. Interactive in both views,
+          since the filter bar is always present here. */}
+      {client.data && <StatsBar stats={client.data.stats} filter={filter} />}
 
       {/* Persistent across both views — the bar sits above the switch, so a
           filter carries over when the user toggles board ↔ list. */}

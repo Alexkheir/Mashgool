@@ -96,14 +96,14 @@ export function AppSidebar({ user, onLogout }: AppSidebarProps) {
                   style={{ backgroundColor: client.color }}
                 />
                 <span className="min-w-0 flex-1 truncate">{client.name}</span>
-                {client.openTaskCount > 0 && (
+                {client.stats.open > 0 && (
                   <span
                     className={cn(
                       'shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-medium tabular-nums',
                       active ? 'bg-brand-100 text-brand-700' : 'bg-neutral-200/70 text-neutral-500'
                     )}
                   >
-                    {client.openTaskCount}
+                    {client.stats.open}
                   </span>
                 )}
               </Link>
