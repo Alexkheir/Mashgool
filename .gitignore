@@ -22,6 +22,9 @@ apps/**/.env.*
 learning/
 LEARNING.md
 
+# Design reference art — local only, not a build input
+Design/
+
 # Production break-glass runbook — local only, never pushed
 RUNBOOK.md
 
