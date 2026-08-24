@@ -8,8 +8,10 @@ import {
   useClients,
   useDeleteClient,
   useUnarchiveClient,
+  sumStats,
   type Client
 } from '@/lib/use-clients';
+import { StatsBar } from '@/components/dashboard/stats-bar';
 import { cn } from '@/lib/utils';
 import { GLOBAL_SCOPE, useUiStore, useViewMode } from '@/lib/ui-store';
 import { useFilterQuery } from '@/lib/filter-store';
@@ -76,7 +78,9 @@ export function ClientsView() {
     deleteTask.mutate(deletingTask.id, { onSuccess: () => setDeletingTask(null) });
   }
 
-  const totalOpen = clients?.reduce((sum, c) => sum + c.openTaskCount, 0) ?? 0;
+  // The global figures are the per-client ones added up — no second endpoint,
+  // and no way for the dashboard and the cards to disagree.
+  const totals = sumStats(clients ?? []);
   const boardView = viewMode === 'board';
 
   return (
@@ -92,7 +96,7 @@ export function ClientsView() {
           <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Dashboard</h1>
           <p className="mt-1 text-sm text-neutral-500">
             {clients && clients.length > 0
-              ? `${clients.length} workspace${clients.length === 1 ? '' : 's'} · ${totalOpen} open task${totalOpen === 1 ? '' : 's'}`
+              ? `${clients.length} workspace${clients.length === 1 ? '' : 's'} · ${totals.open} open task${totals.open === 1 ? '' : 's'}`
               : 'Each client is a workspace with its own task keys.'}
           </p>
         </div>
@@ -104,6 +108,14 @@ export function ClientsView() {
           </Button>
         </div>
       </header>
+
+      {/* The breakdown spans every workspace and is shown in both modes. Its
+          tiles are only *interactive* on the board, where there are tasks (and a
+          filter bar) for a click to act on — in grid mode they are plain stats
+          rather than buttons that would appear to do nothing. */}
+      {clients && clients.length > 0 && (
+        <StatsBar stats={totals} filter={boardView ? filter : undefined} />
+      )}
 
       {/* The filter bar belongs to the board: the grid below it shows *clients*,
           not tasks, so status/priority/due have nothing to act on there. */}

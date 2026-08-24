@@ -37,13 +37,14 @@ describe('CreateTaskDto', () => {
   });
 
   it('accepts a null description and a valid ISO due date', () => {
+    const tomorrow = `${isoDay(1)}T00:00:00.000Z`;
     const parsed = CreateTaskDto.parse({
       title: 'x',
       description: null,
-      dueDate: '2026-08-15T00:00:00.000Z'
+      dueDate: tomorrow
     });
     expect(parsed.description).toBeNull();
-    expect(parsed.dueDate).toBe('2026-08-15T00:00:00.000Z');
+    expect(parsed.dueDate).toBe(tomorrow);
   });
 
   it('rejects a non-ISO due date', () => {

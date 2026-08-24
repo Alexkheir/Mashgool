@@ -3,12 +3,19 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/error.middleware';
 import { writeAuditLog } from './audit.service';
 import type { CreateClientInput, UpdateClientInput } from '../dtos/client.dto';
+import { emptyStats, statsByClient, statsForClient, type TaskStats } from './stats.service';
 
 // The public shape of a client — an explicit whitelist so internal columns
 // (userId, taskCounter) can never leak into an API response by accident.
-// `openTaskCount` is the number of not-Done tasks, surfaced on the client card
-// (Feature 8 spec). It's populated on the list endpoints; mutation responses
-// return 0 and rely on the frontend refetching the list for the live figure.
+//
+// `stats` carries the dashboard numbers (Feature 12): totals, the per-status
+// breakdown, overdue, and progress. It replaced the single `openTaskCount` field
+// Feature 8 added — that number is now `stats.open`, and keeping both would have
+// been two ways to say the same thing.
+//
+// Populated on the read endpoints. Mutation responses return zeroed stats and
+// rely on the frontend refetching, exactly as `openTaskCount` did — a create or
+// rename doesn't change any task count, so the extra queries would be wasted.
 export interface ClientResponse {
   id: string;
   name: string;
@@ -16,12 +23,12 @@ export interface ClientResponse {
   description: string | null;
   color: string;
   isArchived: boolean;
-  openTaskCount: number;
+  stats: TaskStats;
   createdAt: Date;
   updatedAt: Date;
 }
 
-function toClientResponse(client: Client, openTaskCount = 0): ClientResponse {
+function toClientResponse(client: Client, stats: TaskStats = emptyStats()): ClientResponse {
   return {
     id: client.id,
     name: client.name,
@@ -29,17 +36,19 @@ function toClientResponse(client: Client, openTaskCount = 0): ClientResponse {
     description: client.description,
     color: client.color,
     isArchived: client.isArchived,
-    openTaskCount,
+    stats,
     createdAt: client.createdAt,
     updatedAt: client.updatedAt
   };
 }
 
-// A Prisma include that counts only the client's open (not-Done) tasks. Kept in
-// one place so the active and archived list queries stay in sync.
-const openTaskCountInclude = {
-  _count: { select: { tasks: { where: { status: { not: 'DONE' as const } } } } }
-} satisfies Prisma.ClientInclude;
+// Attaches stats to a list of clients in a fixed number of queries, regardless
+// of how many clients there are (see stats.service). The ids are safe to pass
+// on because they came from a userId-scoped query.
+async function withStats(clients: Client[]): Promise<ClientResponse[]> {
+  const stats = await statsByClient(clients.map((c) => c.id));
+  return clients.map((client) => toClientResponse(client, stats.get(client.id)));
+}
 
 // Every read/write is scoped to the owner. A client the user doesn't own is
 // indistinguishable from one that doesn't exist — we return 404, never 403, so
@@ -79,28 +88,32 @@ function mapClientWriteError(err: unknown, shortCode?: string): unknown {
 }
 
 export async function listClients(userId: string): Promise<ClientResponse[]> {
-  const clients = await prisma.client.findMany({
-    where: { userId, isArchived: false },
-    include: openTaskCountInclude,
-    orderBy: { createdAt: 'asc' }
-  });
-  return clients.map((client) => toClientResponse(client, client._count.tasks));
+  return withStats(
+    await prisma.client.findMany({
+      where: { userId, isArchived: false },
+      orderBy: { createdAt: 'asc' }
+    })
+  );
 }
 
 export async function listArchivedClients(userId: string): Promise<ClientResponse[]> {
-  const clients = await prisma.client.findMany({
-    where: { userId, isArchived: true },
-    include: openTaskCountInclude,
-    orderBy: { updatedAt: 'desc' }
-  });
-  return clients.map((client) => toClientResponse(client, client._count.tasks));
+  return withStats(
+    await prisma.client.findMany({
+      where: { userId, isArchived: true },
+      orderBy: { updatedAt: 'desc' }
+    })
+  );
 }
 
+// Carries stats too — the workspace header reads its status breakdown and
+// overdue count from here rather than from a second endpoint (Feature 12's
+// "per-client dashboard").
 export async function getClient(
   userId: string,
   clientId: string
 ): Promise<ClientResponse> {
-  return toClientResponse(await findOwnedClientOrThrow(userId, clientId));
+  const client = await findOwnedClientOrThrow(userId, clientId);
+  return toClientResponse(client, await statsForClient(client.id));
 }
 
 export async function createClient(

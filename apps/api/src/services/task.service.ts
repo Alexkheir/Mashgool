@@ -1,5 +1,6 @@
 import { Prisma, type Task } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { utcDayStart } from '../lib/date';
 import { AppError } from '../middleware/error.middleware';
 import { writeAuditLog } from './audit.service';
 import { generateTaskKey } from './task-key.service';
@@ -118,16 +119,6 @@ async function findOwnedTaskOrThrow(userId: string, taskId: string): Promise<Tas
 }
 
 // ─── Filters (Feature 11) ────────────────────────────────────────────────────
-
-// Midnight UTC on the day `offsetDays` from today. Due dates are day-granular
-// and UTC-anchored everywhere in this app (see the DTO's isNotPast), so the
-// windows below are built the same way.
-function utcDayStart(offsetDays = 0): Date {
-  const now = new Date();
-  return new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offsetDays)
-  );
-}
 
 // `due = today` is the single calendar day. `due = this week` is the *calendar*
 // week containing today, Monday through Sunday — not "the next seven days".
