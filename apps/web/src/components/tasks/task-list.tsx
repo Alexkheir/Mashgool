@@ -13,6 +13,8 @@ interface TaskListProps {
   clientId: string;
   filters: TaskFilters;
   onClearFilters: () => void;
+  // A task to flag briefly — the one paste-to-task just created (Feature 13).
+  highlightId?: string | null;
   onEdit: (task: Task) => void;
   onDelete: (task: Task) => void;
   onCreate: () => void;
@@ -26,6 +28,7 @@ export function TaskList({
   clientId,
   filters,
   onClearFilters,
+  highlightId,
   onEdit,
   onDelete,
   onCreate
@@ -104,6 +107,7 @@ export function TaskList({
             <TaskRow
               key={task.id}
               task={task}
+              highlighted={task.id === highlightId}
               busy={changeStatus.isPending}
               onEdit={() => onEdit(task)}
               onToggleDone={() => changeStatus.mutate({ id: task.id, status: 'DONE' })}

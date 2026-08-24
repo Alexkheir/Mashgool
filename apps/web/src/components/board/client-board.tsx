@@ -12,6 +12,7 @@ interface ClientBoardProps {
   clientId: string;
   filters: TaskFilters;
   onClearFilters: () => void;
+  highlightId?: string | null;
   onOpenTask: (task: BoardTask) => void;
   onAddTask: (status: TaskStatus) => void;
   onCreate: () => void;
@@ -23,6 +24,7 @@ export function ClientBoard({
   clientId,
   filters,
   onClearFilters,
+  highlightId,
   onOpenTask,
   onAddTask,
   onCreate
@@ -57,6 +59,7 @@ export function ClientBoard({
     <ScrumBoard
       columns={columns}
       queryKey={boardKeys.client(clientId, filters)}
+      highlightId={highlightId}
       onOpenTask={onOpenTask}
       onAddTask={onAddTask}
     />

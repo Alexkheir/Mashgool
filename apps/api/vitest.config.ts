@@ -13,7 +13,11 @@ export default defineConfig({
       GOOGLE_CLIENT_ID: 'test-google-client-id',
       GOOGLE_CLIENT_SECRET: 'test-google-client-secret',
       GOOGLE_CALLBACK_URL: 'http://localhost:4000/api/v1/auth/google/callback',
-      ALLOWED_ORIGIN: 'http://localhost:3000'
+      ALLOWED_ORIGIN: 'http://localhost:3000',
+      // Feature 13. No test ever reaches a real provider — the extraction tests
+      // inject a fake through the service's `provider` parameter — but env.ts
+      // still validates the key at import time.
+      CLAUDE_API_KEY: 'test-claude-api-key'
     }
   }
 });

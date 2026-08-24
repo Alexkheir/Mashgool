@@ -25,6 +25,7 @@ interface ScrumBoardProps {
   // Which board's cache a drop should write to (per-client or global).
   queryKey: BoardQueryKey;
   showClient?: boolean;
+  highlightId?: string | null;
   onOpenTask: (task: BoardTask) => void;
   // Per-client boards can create into a column; the global board can't (there is
   // no single workspace for the new task to belong to).
@@ -44,6 +45,7 @@ export function ScrumBoard({
   columns: serverColumns,
   queryKey,
   showClient,
+  highlightId,
   onOpenTask,
   onAddTask
 }: ScrumBoardProps) {
@@ -173,6 +175,7 @@ export function ScrumBoard({
               status={status}
               tasks={columns[status]}
               showClient={showClient}
+              highlightId={highlightId}
               onOpenTask={onOpenTask}
               onAddTask={onAddTask ? () => onAddTask(status) : undefined}
             />

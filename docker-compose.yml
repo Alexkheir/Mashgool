@@ -53,6 +53,13 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-placeholder.apps.googleusercontent.com}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-placeholder-google-client-secret}
       - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:4000/api/v1/auth/google/callback}
+      # AI (Feature 13). Same pattern as the Google credentials: a placeholder so
+      # the stack boots out of the box — env validation would otherwise exit at
+      # startup. Paste-to-task then returns 503 until a real key is set in the
+      # root .env; everything else works.
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY:-placeholder-claude-api-key}
+      - AI_EXTRACTION_PROVIDER=${AI_EXTRACTION_PROVIDER:-anthropic}
+      - AI_EXTRACTION_MODEL=${AI_EXTRACTION_MODEL:-claude-sonnet-5}
     volumes:
       - ./apps/api:/repo/apps/api
       - /repo/apps/api/node_modules
