@@ -60,6 +60,12 @@ services:
       - CLAUDE_API_KEY=${CLAUDE_API_KEY:-placeholder-claude-api-key}
       - AI_EXTRACTION_PROVIDER=${AI_EXTRACTION_PROVIDER:-anthropic}
       - AI_EXTRACTION_MODEL=${AI_EXTRACTION_MODEL:-claude-sonnet-5}
+      # Same placeholder treatment for the transcription key (Feature 14):
+      # voice-to-task returns 503 until a real OPENAI_API_KEY is set in the root
+      # .env, and nothing else is affected.
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-placeholder-openai-api-key}
+      - AI_TRANSCRIPTION_PROVIDER=${AI_TRANSCRIPTION_PROVIDER:-openai}
+      - AI_TRANSCRIPTION_MODEL=${AI_TRANSCRIPTION_MODEL:-whisper-1}
     volumes:
       - ./apps/api:/repo/apps/api
       - /repo/apps/api/node_modules

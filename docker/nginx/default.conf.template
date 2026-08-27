@@ -64,8 +64,16 @@ server {
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-    # AI endpoints (transcribe/structure) can take a while.
-    proxy_read_timeout 60s;
+    # AI endpoints can take a while, and /ai/transcribe (Feature 14) is the
+    # slowest thing the app does: up to a 25 MB upload followed by a Whisper call.
+    # Both directions are raised past the API's own 90s transcription deadline, so
+    # a stalled provider surfaces as our clean 504 rather than nginx's error page,
+    # and a slow uplink is not cut off mid-upload.
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+    # Stream the upload straight through instead of spooling it to disk first —
+    # nginx would otherwise buffer the whole file before the API saw a byte.
+    proxy_request_buffering off;
   }
 
   # ─── NEXT.JS STATIC ASSETS (content-hashed → cache forever) ────────────────

@@ -61,11 +61,14 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_CALLBACK_URL=https://${DOMAIN}/api/v1/auth/google/callback
-      # AI (Feature 13). No default — a missing key must fail loudly at startup
-      # in production rather than silently serving a broken paste-to-task.
+      # AI (Features 13 and 14). No defaults — a missing key must fail loudly at
+      # startup in production rather than silently serving a broken AI feature.
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
       - AI_EXTRACTION_PROVIDER=${AI_EXTRACTION_PROVIDER:-anthropic}
       - AI_EXTRACTION_MODEL=${AI_EXTRACTION_MODEL:-claude-sonnet-5}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - AI_TRANSCRIPTION_PROVIDER=${AI_TRANSCRIPTION_PROVIDER:-openai}
+      - AI_TRANSCRIPTION_MODEL=${AI_TRANSCRIPTION_MODEL:-whisper-1}
     depends_on:
       db:
         condition: service_healthy

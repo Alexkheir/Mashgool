@@ -7,7 +7,7 @@ import { useDeleteTask, type Task } from '@/lib/use-tasks';
 import { useViewMode } from '@/lib/ui-store';
 import { useFilterQuery } from '@/lib/filter-store';
 import { useHighlightedTask } from '@/lib/use-highlight';
-import { PasteToTaskModal } from '@/components/ai/paste-to-task-modal';
+import { AiTaskModal } from '@/components/ai/ai-task-modal';
 import type { TaskStatus } from '@/dtos/task.dto';
 import { TaskList } from './task-list';
 import { TaskForm } from './task-form';
@@ -40,7 +40,7 @@ export function TasksView({ clientId }: { clientId: string }) {
   const [creating, setCreating] = useState<{ status?: TaskStatus } | null>(null);
   const [editing, setEditing] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState<Task | null>(null);
-  const [pasting, setPasting] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   function confirmDelete() {
     if (!deleting) return;
@@ -79,10 +79,11 @@ export function TasksView({ clientId }: { clientId: string }) {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle scope={clientId} />
-          {/* Opened from inside a workspace, so this client is pre-selected. */}
-          <Button variant="ghost" onClick={() => setPasting(true)}>
+          {/* Paste and voice behind one button; opened from inside a workspace,
+              so this client is pre-selected either way. */}
+          <Button variant="ghost" onClick={() => setAiOpen(true)}>
             <SparkIcon className="h-4 w-4" />
-            Paste to task
+            Add with AI
           </Button>
           <Button onClick={() => setCreating({})}>
             <PlusIcon className="h-4 w-4" />
@@ -123,12 +124,12 @@ export function TasksView({ clientId }: { clientId: string }) {
         />
       )}
 
-      {pasting && (
-        <PasteToTaskModal
+      {aiOpen && (
+        <AiTaskModal
           open
           clients={clients.data ?? []}
           initialClientId={clientId}
-          onClose={() => setPasting(false)}
+          onClose={() => setAiOpen(false)}
         />
       )}
 

@@ -87,9 +87,15 @@ export class ApiError extends Error {
 // Exported so sibling hook modules (e.g. use-tasks) share one fetch wrapper —
 // the same credentials, JSON handling, and ApiError semantics.
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  // A FormData body must NOT carry a hand-set Content-Type: the browser has to
+  // write that header itself, because only it knows the multipart boundary it
+  // generated. Setting `application/json` over an upload makes the server parse
+  // the wrong thing and reject a perfectly good file (Feature 14).
+  const isMultipart = init?.body instanceof FormData;
+
   const res = await fetch(apiUrl(path), {
     credentials: 'include',
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: init?.body && !isMultipart ? { 'Content-Type': 'application/json' } : undefined,
     ...init
   });
 
