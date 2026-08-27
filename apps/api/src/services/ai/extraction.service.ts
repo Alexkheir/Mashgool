@@ -6,12 +6,18 @@ import {
   AiProviderError,
   type AiFailureKind,
   type ExtractedTask,
+  type ExtractionSource,
   type TaskExtractionProvider
 } from './types';
 
-// Paste-to-task extraction (Feature 13). The business layer: it owns the
+// Task extraction (Features 13 and 14). The business layer: it owns the
 // user-facing contract, the audit trail, and the translation of provider
 // failures into HTTP, and knows nothing about which vendor is configured.
+//
+// Both paths land here. Paste-to-task calls it with the message the user pasted;
+// voice-to-task calls it with the transcript the user confirmed. `source` is the
+// only difference, and it changes how the text is framed to the model and how
+// the extraction is described in the audit log — not what comes back.
 
 export interface ExtractionResponse {
   extraction: ExtractedTask;
@@ -31,7 +37,11 @@ const STATUS_BY_KIND: Record<AiFailureKind, number> = {
   rate_limit: 429,
   timeout: 504,
   unavailable: 503,
-  invalid_output: 502
+  invalid_output: 502,
+  // What we sent could not be processed. Unreachable from a text extraction —
+  // any string is processable — but the failure kinds are shared with
+  // transcription, where a corrupt upload makes it entirely reachable.
+  invalid_input: 400
 };
 
 const MESSAGE_BY_KIND: Record<AiFailureKind, string> = {
@@ -39,7 +49,22 @@ const MESSAGE_BY_KIND: Record<AiFailureKind, string> = {
   rate_limit: 'The AI service is busy right now. Please try again in a moment.',
   timeout: 'AI extraction took too long. Please try again.',
   unavailable: 'AI extraction is temporarily unavailable. Please try again shortly.',
-  invalid_output: 'Could not read a task from that message. Try rephrasing, or create the task manually.'
+  invalid_output: 'Could not read a task from that message. Try rephrasing, or create the task manually.',
+  invalid_input: 'Could not read a task from that message. Try rephrasing, or create the task manually.'
+};
+
+// What each source's audit entry says. Kept apart from the metadata so the
+// readable line names the actual origin — "pasted text" on a voice note would
+// misdescribe the record for anyone reading the log later.
+const DESCRIPTION: Record<ExtractionSource, { found: string; empty: string }> = {
+  paste: {
+    found: 'Extracted a task from pasted text',
+    empty: 'Pasted text contained no actionable task'
+  },
+  voice: {
+    found: 'Extracted a task from a voice note transcript',
+    empty: 'Voice note transcript contained no actionable task'
+  }
 };
 
 // `provider` is injectable so tests can drive the service with a fake instead of
@@ -47,6 +72,7 @@ const MESSAGE_BY_KIND: Record<AiFailureKind, string> = {
 export async function extractTaskFromText(
   userId: string,
   text: string,
+  source: ExtractionSource,
   provider: TaskExtractionProvider = getExtractionProvider()
 ): Promise<ExtractionResponse> {
   // The same UTC day-start the due-date guard, the `due=today` filter and the
@@ -56,7 +82,7 @@ export async function extractTaskFromText(
 
   let extraction: ExtractedTask;
   try {
-    extraction = await provider.extractTask({ text, today });
+    extraction = await provider.extractTask({ text, today, source });
   } catch (error) {
     if (error instanceof AiProviderError) {
       // The full cause is logged here and nowhere else — the client gets the
@@ -73,16 +99,17 @@ export async function extractTaskFromText(
   }
 
   // Audit records the *outcome*, never the input. `text` is a private client
-  // message and must not reach the log — only its length, as a usage signal
-  // (CLAUDE.md: "never log raw AI input content").
+  // message or a transcript of the user's own voice, and must not reach the log —
+  // only its length, as a usage signal (CLAUDE.md: "never log raw AI input
+  // content").
   writeAuditLog({
     userId,
     action: 'AI_EXTRACTION_TRIGGERED',
     description: extraction.hasActionableTask
-      ? 'Extracted a task from pasted text'
-      : 'Pasted text contained no actionable task',
+      ? DESCRIPTION[source].found
+      : DESCRIPTION[source].empty,
     metadata: {
-      via: 'paste',
+      via: source,
       providerId: provider.id,
       model: provider.model,
       inputLength: text.length,

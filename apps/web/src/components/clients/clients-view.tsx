@@ -24,7 +24,7 @@ import { TaskForm } from '@/components/tasks/task-form';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { ViewToggle } from '@/components/ui/view-toggle';
-import { PasteToTaskModal } from '@/components/ai/paste-to-task-modal';
+import { AiTaskModal } from '@/components/ai/ai-task-modal';
 import { PlusIcon, SparkIcon } from '@/components/ui/icons';
 
 export function ClientsView() {
@@ -54,7 +54,7 @@ export function ClientsView() {
   const [editing, setEditing] = useState<Client | null>(null);
   const [deleting, setDeleting] = useState<Client | null>(null);
   const [showArchived, setShowArchived] = useState(false);
-  const [pasting, setPasting] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   // Tasks opened from the global board — the dashboard edits and deletes them in
   // place rather than sending the user into the workspace first.
@@ -104,13 +104,15 @@ export function ClientsView() {
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle scope={GLOBAL_SCOPE} />
-          {/* No workspace is implied here, so the modal asks which client the
-              pasted message belongs to. Hidden until there's somewhere to put a
-              task — with no clients, the dropdown would have nothing to offer. */}
+          {/* One entry point for both AI paths — the modal's tabs choose between
+              pasting a message and recording a note (Features 13 and 14). No
+              workspace is implied here, so it also asks which client the task
+              belongs to. Hidden until there's somewhere to put a task — with no
+              clients, the dropdown would have nothing to offer. */}
           {clients && clients.length > 0 && (
-            <Button variant="ghost" onClick={() => setPasting(true)}>
+            <Button variant="ghost" onClick={() => setAiOpen(true)}>
               <SparkIcon className="h-4 w-4" />
-              Paste to task
+              Add with AI
             </Button>
           )}
           <Button onClick={() => setCreating(true)}>
@@ -213,13 +215,7 @@ export function ClientsView() {
         )}
       </div>
 
-      {pasting && (
-        <PasteToTaskModal
-          open
-          clients={clients ?? []}
-          onClose={() => setPasting(false)}
-        />
-      )}
+      {aiOpen && <AiTaskModal open clients={clients ?? []} onClose={() => setAiOpen(false)} />}
 
       {/* Create / edit share one form component, keyed so state resets per client. */}
       {creating && <ClientForm open onClose={() => setCreating(false)} />}

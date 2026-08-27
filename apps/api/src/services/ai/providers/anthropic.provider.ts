@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { TASK_PRIORITIES } from '../../../dtos/task.dto';
-import { EXTRACTION_SYSTEM_PROMPT, buildExtractionUserPrompt } from '../prompt';
+import { buildExtractionSystemPrompt, buildExtractionUserPrompt } from '../prompt';
 import {
   AiProviderError,
   type ExtractedTask,
@@ -107,7 +107,9 @@ export function createAnthropicProvider(config: AnthropicProviderConfig): TaskEx
           // The response is a handful of short fields; the cap exists to bound a
           // runaway, not to shape the answer.
           max_tokens: 1024,
-          system: EXTRACTION_SYSTEM_PROMPT,
+          // Framed by source: the same rules, but a transcript is introduced
+          // as the user’s own dictation rather than a third party’s message.
+          system: buildExtractionSystemPrompt(request.source),
           output_config: { format: zodOutputFormat(ExtractionSchema) },
           messages: [{ role: 'user', content: buildExtractionUserPrompt(request) }]
         });
